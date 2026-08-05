@@ -96,7 +96,7 @@ pub(super) fn handle_mcp_tools_changed(notif: &acp::ExtNotification, app: &mut A
     let target: Option<(bool, AgentId)> = match session_id.as_deref() {
         Some(sid) => {
             let sid = acp::SessionId::new(sid);
-            match find_session_match(app, &sid) {
+            match find_session_match(app, &sid, true) {
                 // Subagent (child) sessions don't own the top-level MCP
                 // modal / connecting indicator — drop them.
                 Some(SessionMatch::Child(_)) => None,
@@ -214,7 +214,7 @@ pub(super) fn handle_mcp_server_status(notif: &acp::ExtNotification, app: &mut A
     };
 
     let session_id = acp::SessionId::new(payload.session_id);
-    let Some(matched) = find_session_match(app, &session_id) else {
+    let Some(matched) = find_session_match(app, &session_id, true) else {
         return false;
     };
     let id = matched.agent_id();

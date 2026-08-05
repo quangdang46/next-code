@@ -187,7 +187,7 @@ pub fn build_roster(
     for sid in grok_ids {
         let info = &subagents[sid];
         let status = grok_status(info);
-        if should_collapse_idle(status, info.last_progress_at, now, idle_hide_secs, subagents) {
+        if should_collapse_idle(info.last_progress_at, now, idle_hide_secs, subagents) {
             continue;
         }
         rows.push(AgentRosterRow {
@@ -255,19 +255,23 @@ fn grok_status(info: &SubagentInfo) -> RosterStatus {
     }
 }
 
-/// Claude 2.1.199+ spirit: hide idle rows after `idle_hide_secs` when all workers idle.
+/// Hide idle rows after `idle_hide_secs` of inactivity.
+///
+/// Each subagent is evaluated independently — a row is hidden once its idle
+/// timer expires, regardless of whether other subagents are still running.
+/// Terminal rows are hidden by their finish time (`last_progress` is stamped
+/// on `SubagentFinished`). Non-terminal rows are hidden too when stale: a
+/// `finished:false` row whose last progress predates the threshold is either a
+/// phantom/orphan (no `SubagentFinished` will ever arrive) or a long-idle
+/// runner, and leaving it would show a permanently "running" row forever.
+/// `idle_hide_secs == 0` means never-hide.
 fn should_collapse_idle(
-    status: RosterStatus,
     last_progress: Instant,
     now: Instant,
     idle_hide_secs: u64,
-    subagents: &HashMap<String, SubagentInfo>,
+    _subagents: &HashMap<String, SubagentInfo>,
 ) -> bool {
-    if idle_hide_secs == 0 || !status.is_terminal() {
-        return false;
-    }
-    let any_active = subagents.values().any(|i| !i.finished || i.pending_kill);
-    if any_active {
+    if idle_hide_secs == 0 {
         return false;
     }
     now.duration_since(last_progress).as_secs() >= idle_hide_secs
@@ -278,15 +282,9 @@ fn should_collapse_idle_swarm(
     last_update: Instant,
     now: Instant,
     idle_hide_secs: u64,
-    members: &HashMap<String, SwarmMemberMirror>,
+    _members: &HashMap<String, SwarmMemberMirror>,
 ) -> bool {
     if idle_hide_secs == 0 || !status.is_terminal() {
-        return false;
-    }
-    let any_active = members
-        .values()
-        .any(|m| !m.roster_status().is_terminal());
-    if any_active {
         return false;
     }
     now.duration_since(last_update).as_secs() >= idle_hide_secs
@@ -609,6 +607,43 @@ mod tests {
         let rows = build_roster("Lead", &sub, &HashMap::new(), &HashMap::new(), Instant::now(), 30);
         assert_eq!(rows.len(), 1); // lead only
         assert!(rows[0].is_lead);
+    }
+
+    #[test]
+    fn idle_collapse_hides_stale_nonterminal_row() {
+        let mut sub = HashMap::new();
+        // A finished:false orphan/phantom whose last progress is stale must be
+        // hidden after the same idle threshold as a terminal row.
+        let mut ghost = sample_subagent("ghost", false);
+        ghost.last_progress_at = Instant::now() - Duration::from_secs(60);
+        sub.insert("ghost".into(), ghost);
+        let rows = build_roster("Lead", &sub, &HashMap::new(), &HashMap::new(), Instant::now(), 30);
+        assert_eq!(rows.len(), 1); // lead only
+        assert!(rows[0].is_lead);
+    }
+
+    #[test]
+    fn idle_collapse_keeps_recent_nonterminal_row() {
+        let mut sub = HashMap::new();
+        let mut ghost = sample_subagent("ghost", false);
+        ghost.last_progress_at = Instant::now() - Duration::from_secs(5);
+        sub.insert("ghost".into(), ghost);
+        let rows = build_roster("Lead", &sub, &HashMap::new(), &HashMap::new(), Instant::now(), 30);
+        assert_eq!(rows.len(), 2); // lead + still-recent ghost
+        assert_eq!(rows[1].id, "ghost");
+        assert_eq!(rows[1].status, RosterStatus::Running);
+    }
+
+    #[test]
+    fn idle_collapse_zero_secs_never_hides() {
+        let mut sub = HashMap::new();
+        let mut done = sample_subagent("done", true);
+        done.last_progress_at = Instant::now() - Duration::from_secs(999);
+        sub.insert("done".into(), done);
+        // idle_hide_secs == 0 means never-hide, even for a stale terminal row.
+        let rows = build_roster("Lead", &sub, &HashMap::new(), &HashMap::new(), Instant::now(), 0);
+        assert_eq!(rows.len(), 2); // lead + done
+        assert_eq!(rows[1].status, RosterStatus::Completed);
     }
 
     #[test]

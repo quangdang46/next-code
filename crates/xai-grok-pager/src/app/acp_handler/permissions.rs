@@ -22,7 +22,7 @@ pub(super) fn handle_permission_request(
     app: &mut AppView,
 ) -> bool {
     // 1. Look up the owning agent by session_id (root or subagent view).
-    let matched = match find_session_match(app, &perm.request.session_id) {
+    let matched = match find_session_match(app, &perm.request.session_id, true) {
         Some(m) => m,
         None => {
             tracing::warn!(

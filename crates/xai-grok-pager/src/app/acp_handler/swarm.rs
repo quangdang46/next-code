@@ -81,17 +81,25 @@ pub(super) fn handle_swarm_status(notif: &acp::ExtNotification, app: &mut AppVie
         return false;
     };
     let sid = acp::SessionId::new(parsed.session_id);
-    let Some(matched) = find_session_match(app, &sid) else {
+    let Some(matched) = find_session_match(app, &sid, true) else {
         return false;
     };
     let parent_id = matched.agent_id();
     let Some(agent) = app.agents.get_mut(&parent_id) else {
         return false;
     };
+    // The daemon's swarm roster includes the lead session itself in `members`;
+    // the roster already renders a dedicated lead row (`__lead__`), so mirroring
+    // the lead here would show it twice (a phantom worker row). There is no
+    // role-based lead marker on the wire (`role` is "agent" | "coordinator" |
+    // "worktree_manager"), so exclude by the agent's own root session id.
+    // When the root session id is unset (pre-assignment race), keep all members.
+    let lead_sid = agent.session.session_id.as_ref().map(|s| s.0.as_ref());
     let now = Instant::now();
     let members: Vec<SwarmMemberMirror> = parsed
         .members
         .into_iter()
+        .filter(|m| lead_sid != Some(m.session_id.as_str()))
         .map(|m| SwarmMemberMirror {
             session_id: m.session_id,
             friendly_name: m.friendly_name,
@@ -119,7 +127,7 @@ pub(super) fn handle_swarm_member_message(
     };
     // Match on lead session from envelope sessionId when present; else scan.
     let lead = acp::SessionId::new(parsed._lead_session_id.clone());
-    let parent_id = find_session_match(app, &lead)
+    let parent_id = find_session_match(app, &lead, true)
         .map(|m| m.agent_id())
         .or_else(|| {
             app.agents.iter().find_map(|(id, agent)| {
@@ -160,7 +168,7 @@ pub(super) fn handle_swarm_plan(notif: &acp::ExtNotification, app: &mut AppView)
         return false;
     };
     let sid = acp::SessionId::new(parsed.session_id);
-    let Some(matched) = find_session_match(app, &sid) else {
+    let Some(matched) = find_session_match(app, &sid, true) else {
         return false;
     };
     let parent_id = matched.agent_id();

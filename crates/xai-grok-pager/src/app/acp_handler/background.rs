@@ -106,7 +106,8 @@ pub(super) fn handle_task_backgrounded(notif: &acp::ExtNotification, app: &mut A
     let meta = NotificationMeta::from_json(session_notif.meta.as_ref().and_then(|v| v.as_object()));
     let restored_from_replay = meta.is_replay;
 
-    let (matched, is_active, agent) = match resolve_notif_agent(app, &session_notif.session_id) {
+    let (matched, is_active, agent) = match resolve_notif_agent(app, &session_notif.session_id, false)
+    {
         Some(t) => t,
         None => return false,
     };
@@ -233,7 +234,7 @@ pub(super) fn handle_task_backgrounded(notif: &acp::ExtNotification, app: &mut A
     // its awaiting wait must re-evaluate the skipped park. Root only — child
     // tasks never enter root `bg_tasks`.
     if !matches!(matched, SessionMatch::Child(_))
-        && let Some((_, _, agent)) = resolve_notif_agent(app, &session_notif.session_id)
+        && let Some((_, _, agent)) = resolve_notif_agent(app, &session_notif.session_id, false)
     {
         agent.maybe_push_parked_marker();
     }
@@ -254,7 +255,8 @@ pub(super) fn handle_monitor_event(notif: &acp::ExtNotification, app: &mut AppVi
         } => (task_id, description, event_text),
         _ => return false,
     };
-    let (matched, is_active, agent) = match resolve_notif_agent(app, &session_notif.session_id) {
+    let (matched, is_active, agent) = match resolve_notif_agent(app, &session_notif.session_id, true)
+    {
         Some(t) => t,
         None => return false,
     };
@@ -296,7 +298,7 @@ pub(super) fn handle_scheduled_task_created(
         } => (task_id, prompt, human_schedule, next_fire_at),
         _ => return false,
     };
-    let matched = match find_session_match(app, &session_notif.session_id) {
+    let matched = match find_session_match(app, &session_notif.session_id, false) {
         Some(m) => m,
         None => return false,
     };
@@ -350,7 +352,7 @@ pub(super) fn handle_scheduled_task_fired(notif: &acp::ExtNotification, app: &mu
         } => (task_id, prompt, human_schedule, next_fire_at, subagent_id),
         _ => return false,
     };
-    let matched = match find_session_match(app, &session_notif.session_id) {
+    let matched = match find_session_match(app, &session_notif.session_id, false) {
         Some(m) => m,
         None => return false,
     };
@@ -402,7 +404,7 @@ pub(super) fn handle_scheduled_task_deleted(
         XaiSessionUpdate::ScheduledTaskDeleted { task_id } => task_id,
         _ => return false,
     };
-    let matched = match find_session_match(app, &session_notif.session_id) {
+    let matched = match find_session_match(app, &session_notif.session_id, false) {
         Some(m) => m,
         None => return false,
     };
@@ -573,7 +575,8 @@ pub(super) fn handle_task_completed(notif: &acp::ExtNotification, app: &mut AppV
         _ => return false,
     };
 
-    let (matched, is_active, agent) = match resolve_notif_agent(app, &session_notif.session_id) {
+    let (matched, is_active, agent) = match resolve_notif_agent(app, &session_notif.session_id, false)
+    {
         Some(t) => t,
         None => return false,
     };

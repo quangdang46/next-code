@@ -35,11 +35,15 @@ impl SessionMatch {
 ///
 /// Convenience wrapper around `find_session_match` + `is_matched_agent_active`
 /// + `agents.get_mut()`, used by the bg-task notification handlers.
+/// `allow_race_fallback` is forwarded to [`find_session_match`]; pass `false`
+/// for subagent-lifecycle notifications (TaskBackgrounded / TaskCompleted),
+/// which must never ride the pass-3 fallback onto an unbound active agent.
 pub(super) fn resolve_notif_agent<'a>(
     app: &'a mut AppView,
     session_id: &acp::SessionId,
+    allow_race_fallback: bool,
 ) -> Option<(SessionMatch, bool, &'a mut AgentView)> {
-    let matched = find_session_match(app, session_id)?;
+    let matched = find_session_match(app, session_id, allow_race_fallback)?;
     let parent_id = matched.agent_id();
     let is_active = is_matched_agent_active(app, parent_id);
     let agent = app.agents.get_mut(&parent_id)?;
@@ -69,7 +73,7 @@ pub(super) fn mcp_target_agent<'a>(
     match session_id {
         Some(sid) => {
             let sid = acp::SessionId::new(sid);
-            let (matched, is_active, agent) = resolve_notif_agent(app, &sid)?;
+            let (matched, is_active, agent) = resolve_notif_agent(app, &sid, true)?;
             if matches!(matched, SessionMatch::Child(_)) {
                 return None;
             }
@@ -110,11 +114,20 @@ pub(super) fn resolve_target_view<'a>(
 /// 1. Exact root match: an agent whose `session.session_id` equals `session_id`.
 /// 2. Subagent view: any agent whose `subagent_views` map contains `session_id`
 ///    as a key.
-/// 3. Race-window fallback: when no exact match exists AND the currently active
-///    agent has no `session_id` yet, route to it. Notifications can race ahead
-///    of `TaskResult::SessionCreated`, and the only agent that could possibly
-///    own such a pre-assignment notification is the one the user just created
-///    (which is necessarily active and has `session_id == None`).
+/// 3. Race-window fallback (when `allow_race_fallback`): when no exact match
+///    exists AND the currently active agent has no `session_id` yet, route to
+///    it. Notifications can race ahead of `TaskResult::SessionCreated`, and the
+///    only agent that could possibly own such a pre-assignment notification is
+///    the one the user just created (which is necessarily active and has
+///    `session_id == None`).
+///
+/// `allow_race_fallback` must be `false` for subagent-lifecycle notifications
+/// (`SubagentSpawned` / `SubagentProgress` / `SubagentFinished` /
+/// `TaskBackgrounded` / `TaskCompleted`): those mutate `subagent_sessions` /
+/// `subagent_views`, and routing one through the fallback to the active,
+/// still-unbound agent would mint an eternal `finished:false` orphan under the
+/// wrong owner. They require an exact Root/Child match; the caller drops the
+/// notification when `find_session_match` returns `None`.
 ///
 /// Returns `None` when the notification cannot be associated with any agent;
 /// the caller should drop it (sending an empty Ok response if applicable).
@@ -125,6 +138,7 @@ pub(super) fn resolve_target_view<'a>(
 pub(super) fn find_session_match(
     app: &AppView,
     session_id: &acp::SessionId,
+    allow_race_fallback: bool,
 ) -> Option<SessionMatch> {
     // Single pass over `app.agents`: prefer an exact root match (returned
     // immediately, since root takes precedence) but track the first child
@@ -153,8 +167,10 @@ pub(super) fn find_session_match(
     // root session_id has been assigned. Only the active agent is eligible,
     // and only when its `session_id` is still `None` -- otherwise we would
     // misroute a stranger's notification to whichever agent happens to be
-    // foregrounded.
-    if let ActiveView::Agent(active_id) = app.active_view
+    // foregrounded. Skipped for subagent-lifecycle notifications (see the
+    // `allow_race_fallback` doc above).
+    if allow_race_fallback
+        && let ActiveView::Agent(active_id) = app.active_view
         && let Some(agent) = app.agents.get(&active_id)
         && agent.session.session_id.is_none()
     {
@@ -182,7 +198,7 @@ pub(super) fn is_matched_agent_active(app: &AppView, matched_agent: AgentId) -> 
 /// the leader's replay-on-attach.
 pub(super) fn interaction_target_agent(app: &AppView, session_id: &str) -> Option<AgentId> {
     let sid = acp::SessionId::new(session_id.to_owned());
-    match find_session_match(app, &sid) {
+    match find_session_match(app, &sid, true) {
         Some(SessionMatch::Root(id) | SessionMatch::Child(id)) => Some(id),
         None => None,
     }
