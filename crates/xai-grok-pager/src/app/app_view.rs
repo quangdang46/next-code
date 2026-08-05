@@ -4949,6 +4949,13 @@ impl AppView {
                     needs_redraw = true;
                 }
             }
+            // Reap orphan subagent rows (finished, or stale past the removal
+            // threshold) so phantom/orphan rows are removed — not just hidden
+            // by the roster's idle-collapse — and their child views freed.
+            needs_redraw |= crate::app::subagent::reap_orphan_subagents(
+                agent,
+                std::time::Instant::now(),
+            );
         }
         if let Some(commands) = bootstrap_commands_update {
             self.welcome_prompt

@@ -308,6 +308,62 @@ pub(crate) fn finalize_finished_child_view(
         },
         ));
 }
+
+/// How long a non-finished subagent may sit without a `SubagentProgress` /
+/// tool update before it is considered an orphan and reaped (removed) from
+/// the roster.
+///
+/// The TUI only *hides* a stale row after `idle_hide_secs` (10s in the Face
+/// agent team panel); this is the destructive removal threshold. It is far
+/// longer on purpose — a genuinely-running subagent can legitimately go quiet
+/// (long tool, model think), and only a spawn that will never receive a
+/// `SubagentFinished` (the Face bridge's orphan case) should be removed.
+pub(crate) const SUBAGENT_REAP_STALE_SECS: u64 = 120;
+
+/// Reap orphan subagent rows from `subagent_sessions` / `subagent_views`.
+///
+/// Removes any entry that is either finished (a `SubagentFinished` landed but
+/// nobody removed the row) or has been stale for longer than
+/// [`SUBAGENT_REAP_STALE_SECS`] while still `finished:false` — the phantom /
+/// orphan signature. This is what actually frees the memory and shrinks the
+/// roster; [`crate::app::agent_roster::should_collapse_idle`] only hides.
+///
+/// Guards: a non-finished row the user is actively viewing (fullscreen via
+/// `active_subagent`) is never reaped — a live-but-quiet worker must not be
+/// yanked out from under the user. Finished rows are always reaped, even when
+/// viewed (the child view is already finalized). Reaping clears
+/// `active_subagent` when the row it pointed at goes away so the parent never
+/// renders a missing child. Returns whether any row was removed.
+pub(crate) fn reap_orphan_subagents(
+    parent: &mut crate::app::agent_view::AgentView,
+    now: std::time::Instant,
+) -> bool {
+    let stale: Vec<String> = parent
+        .subagent_sessions
+        .iter()
+        .filter(|(sid, info)| {
+            let stale_non_finished = !info.finished
+                && parent.active_subagent.as_deref() != Some(sid.as_str())
+                && now
+                    .duration_since(info.last_progress_at)
+                    .as_secs()
+                    >= SUBAGENT_REAP_STALE_SECS;
+            info.finished || stale_non_finished
+        })
+        .map(|(sid, _)| sid.clone())
+        .collect();
+    if stale.is_empty() {
+        return false;
+    }
+    for sid in &stale {
+        parent.subagent_sessions.remove(sid);
+        parent.subagent_views.remove(sid);
+        if parent.active_subagent.as_deref() == Some(sid.as_str()) {
+            parent.active_subagent = None;
+        }
+    }
+    true
+}
 fn join_meta_parts(parts: &[Option<&str>]) -> String {
     let non_empty: Vec<&str> = parts.iter().copied().flatten().collect();
     if non_empty.is_empty() {
@@ -500,7 +556,7 @@ mod tests {
     use std::collections::{BTreeMap, HashMap, VecDeque};
     use std::path::PathBuf;
     use std::sync::Arc;
-    use std::time::Instant;
+    use std::time::{Duration, Instant};
     fn make_info() -> SubagentInfo {
         SubagentInfo {
             subagent_id: "sa-1".into(),
@@ -594,6 +650,91 @@ mod tests {
             &mut view.scrollback,
         );
     }
+    #[test]
+    fn reap_removes_finished_and_stale_orphans() {
+        let mut parent = make_min_child_view();
+        let mut finished = make_info();
+        finished.child_session_id = "child-finished".into();
+        finished.finished = true;
+        parent
+            .subagent_sessions
+            .insert("child-finished".into(), finished);
+        parent
+            .subagent_views
+            .insert("child-finished".into(), Box::new(make_min_child_view()));
+
+        // A stale finished:false orphan — last progress long past the removal
+        // threshold. The phantom-spawn signature.
+        let mut ghost = make_info();
+        ghost.child_session_id = "child-ghost".into();
+        ghost.last_progress_at = Instant::now() - Duration::from_secs(SUBAGENT_REAP_STALE_SECS + 60);
+        parent.subagent_sessions.insert("child-ghost".into(), ghost);
+        parent
+            .subagent_views
+            .insert("child-ghost".into(), Box::new(make_min_child_view()));
+
+        // A recent non-finished subagent must survive (genuinely running).
+        let mut live = make_info();
+        live.child_session_id = "child-live".into();
+        live.last_progress_at = Instant::now() - Duration::from_secs(5);
+        parent.subagent_sessions.insert("child-live".into(), live);
+
+        assert!(
+            reap_orphan_subagents(&mut parent, Instant::now()),
+            "stale + finished rows must be reaped"
+        );
+        assert!(parent.subagent_sessions.get("child-finished").is_none());
+        assert!(parent.subagent_sessions.get("child-ghost").is_none());
+        assert!(parent.subagent_views.get("child-finished").is_none());
+        assert!(parent.subagent_views.get("child-ghost").is_none());
+        assert!(parent.subagent_sessions.get("child-live").is_some());
+    }
+
+    #[test]
+    fn reap_never_removes_viewed_or_recent_rows() {
+        let mut parent = make_min_child_view();
+        // A stale row the user is actively viewing fullscreen must be kept.
+        let mut viewed = make_info();
+        viewed.child_session_id = "child-viewed".into();
+        viewed.last_progress_at =
+            Instant::now() - Duration::from_secs(SUBAGENT_REAP_STALE_SECS + 60);
+        parent.subagent_sessions.insert("child-viewed".into(), viewed);
+        parent
+            .subagent_views
+            .insert("child-viewed".into(), Box::new(make_min_child_view()));
+        parent.active_subagent = Some("child-viewed".into());
+
+        assert!(
+            !reap_orphan_subagents(&mut parent, Instant::now()),
+            "nothing to reap — the only row is being viewed"
+        );
+        assert!(parent.subagent_sessions.get("child-viewed").is_some());
+        assert_eq!(parent.active_subagent.as_deref(), Some("child-viewed"));
+    }
+
+    #[test]
+    fn reap_clears_active_subagent_when_viewed_row_reaped() {
+        let mut parent = make_min_child_view();
+        // active_subagent points at a row that becomes stale — reaping it must
+        // also clear the pointer so the parent never renders a missing child.
+        let mut viewed = make_info();
+        viewed.child_session_id = "child-gone".into();
+        viewed.finished = true;
+        parent.subagent_sessions.insert("child-gone".into(), viewed);
+        parent
+            .subagent_views
+            .insert("child-gone".into(), Box::new(make_min_child_view()));
+        parent.active_subagent = Some("child-gone".into());
+
+        assert!(
+            reap_orphan_subagents(&mut parent, Instant::now()),
+            "a finished row is reaped even when active_subagent points at it"
+        );
+        assert!(parent.subagent_sessions.is_empty());
+        assert!(parent.subagent_views.is_empty());
+        assert_eq!(parent.active_subagent, None, "pointer must be cleared");
+    }
+
     #[test]
     fn child_scrollback_already_shows_prompt_matches_user_prompt() {
         let mut view = make_min_child_view();

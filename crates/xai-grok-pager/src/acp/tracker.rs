@@ -2247,12 +2247,23 @@ fn is_goal_tool(tc: &acp::ToolCall) -> bool {
 /// Suppressed from scrollback because the SubagentBlock (created from
 /// SubagentSpawned notification) provides better visibility. Covers the
 /// `task` / `Task` / `spawn_subagent` ids and Task-family variant tags.
+///
+/// The bare title "Agent" is NOT classified as a task tool by itself: that
+/// is the app's own swarm-coordinator tool, which carries no `variant` or
+/// `task_id` and shows as ordinary foreground tooling. An "Agent"-titled
+/// tool only counts as a subagent spawn when it carries a Task-family
+/// variant or a `task_id`, proving it is a real Grok spawn.
 fn is_task_tool(tc: &acp::ToolCall) -> bool {
-    matches!(
-        tc.title.as_str(),
-        "task" | "Task" | "spawn_subagent" | "Agent"
-    )
-        || is_task_variant(extract_variant(tc))
+    let title = tc.title.as_str();
+    let is_real_grok_task_title = matches!(title, "task" | "Task" | "spawn_subagent");
+    let is_agent_subagent_spawn = title == "Agent"
+        && (is_task_variant(extract_variant(tc))
+            || tc.raw_input
+                .as_ref()
+                .and_then(|v| v.get("task_id"))
+                .and_then(|v| v.as_str())
+                .is_some());
+    is_real_grok_task_title || is_agent_subagent_spawn || is_task_variant(extract_variant(tc))
 }
 /// Check if a tool call is a scheduler tool (scheduler_create/delete/list).
 ///
@@ -5619,6 +5630,8 @@ mod tests {
     #[test]
     fn is_task_tool_recognizes_grok_build_variant() {
         assert!(is_task_tool(&initial_tool_call("tc1", "task")));
+        assert!(is_task_tool(&initial_tool_call("tc1b", "Task")));
+        assert!(is_task_tool(&initial_tool_call("tc1c", "spawn_subagent")));
         let mut with_variant = initial_tool_call("tc2", "anything");
         with_variant.raw_input = Some(serde_json::json!({ "variant" : "Task" }));
         assert!(is_task_tool(&with_variant));
@@ -5631,6 +5644,24 @@ mod tests {
         let mut with_variant = initial_tool_call("tc4", "anything");
         with_variant.raw_input = Some(serde_json::json!({ "variant" : "Bash" }));
         assert!(!is_task_tool(&with_variant));
+    }
+    #[test]
+    fn is_task_tool_rejects_bare_agent_title() {
+        // The app's own swarm-coordinator "Agent" tool has no variant/task_id
+        // and must not be classified as a subagent spawn.
+        assert!(!is_task_tool(&initial_tool_call("tc1", "Agent")));
+        let mut empty_input = initial_tool_call("tc2", "Agent");
+        empty_input.raw_input = Some(serde_json::json!({}));
+        assert!(!is_task_tool(&empty_input));
+    }
+    #[test]
+    fn is_task_tool_recognizes_agent_title_with_task_evidence() {
+        let mut with_variant = initial_tool_call("tc1", "Agent");
+        with_variant.raw_input = Some(serde_json::json!({ "variant" : "Task" }));
+        assert!(is_task_tool(&with_variant));
+        let mut with_task_id = initial_tool_call("tc2", "Agent");
+        with_task_id.raw_input = Some(serde_json::json!({ "task_id" : "sub_123" }));
+        assert!(is_task_tool(&with_task_id));
     }
     #[test]
     fn is_bg_plumbing_tool_recognizes_all_name_generations() {

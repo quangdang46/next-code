@@ -1,2 +1,9 @@
-active_modes = []
-updated_at = "2026-07-25T18:09:06.158933+00:00"
+updated_at = "2026-07-29T16:45:39.428859+00:00"
+
+[[active_modes]]
+workflow = "best-of-n"
+activated_at = "2026-07-29T16:31:21.078071+00:00"
+turn_count = 7
+turn_limit = 10
+
+[active_modes.metadata]
