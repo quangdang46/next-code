@@ -89,14 +89,10 @@ printf '%s\n' "$hash" > "$builds_dir/current-version"
 install_dir="${NEXT_CODE_INSTALL_DIR:-$HOME/.local/bin}"
 mkdir -p "$install_dir"
 ln -sfn "$current_dir/next-code" "$install_dir/next-code"
-# Compat symlink for one release so existing `next-code` muscle memory keeps working.
-ln -sfn "next-code" "$install_dir/next-code"
-
 echo "Installed: $version_dir/next-code"
 echo "Updated stable symlink: $stable_dir/next-code -> $version_dir/next-code"
 echo "Updated current symlink: $current_dir/next-code -> $version_dir/next-code"
 echo "Updated launcher symlink: $install_dir/next-code -> $current_dir/next-code"
-echo "Updated compat symlink: $install_dir/next-code -> next-code"
 
 # Configure supported desktop launch hotkeys as part of installation. This is
 # idempotent and best-effort because headless installs may not expose a desktop
