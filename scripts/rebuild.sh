@@ -21,9 +21,10 @@ else
 fi
 strip ~/.next-code/builds/current/next-code
 
-# Keep launcher symlink in sync when present.
+# Keep launcher + `nextcode` compat symlinks in sync when present.
 if [[ -d "$HOME/.local/bin" ]]; then
   ln -sfn "$HOME/.next-code/builds/current/next-code" "$HOME/.local/bin/next-code"
+  ln -sfn "next-code" "$HOME/.local/bin/nextcode"
 fi
 
 echo "==> Killing old server daemon..."

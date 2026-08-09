@@ -135,6 +135,7 @@ stable_dir="$builds_dir/stable"
 current_dir="$builds_dir/current"
 version_dir="$builds_dir/versions"
 launcher_path="$INSTALL_DIR/next-code${EXE}"
+compat_launcher_path="$INSTALL_DIR/nextcode${EXE}"
 
 EXISTING=""
 if [ -x "$launcher_path" ]; then
