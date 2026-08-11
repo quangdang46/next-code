@@ -60,11 +60,19 @@ impl Provider for OpenRouterProvider {
                 None
             }
         });
-        let allow_reasoning = (self.supports_provider_features || kimi_coding_endpoint)
+        // DeepSeek models served directly (no OpenRouter provider features) still
+        // emit `reasoning_content` for their thinking; without this scoping the
+        // reasoning would be dropped for direct DeepSeek routes (issue #815).
+        let direct_deepseek_model =
+            !self.supports_provider_features && Self::model_is_deepseek_family(&model);
+        let allow_reasoning = (self.supports_provider_features
+            || kimi_coding_endpoint
+            || direct_deepseek_model)
             && thinking_enabled != Some(false);
         let include_reasoning_content = thinking_enabled == Some(true)
             || (allow_reasoning && Self::is_kimi_model(&model))
-            || kimi_coding_endpoint;
+            || kimi_coding_endpoint
+            || direct_deepseek_model;
 
         // Some OpenAI-compatible providers (e.g. Mistral) strictly enforce the
         // OpenAI schema and reject the non-standard `reasoning_content` message
