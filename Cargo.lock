@@ -6270,6 +6270,7 @@ dependencies = [
  "next-code-best-of-n",
  "next-code-build-meta",
  "next-code-build-support",
+ "next-code-command-risk",
  "next-code-compaction-core",
  "next-code-config-types",
  "next-code-core",
@@ -6427,6 +6428,7 @@ dependencies = [
  "next-code-best-of-n",
  "next-code-build-meta",
  "next-code-build-support",
+ "next-code-command-risk",
  "next-code-compaction-core",
  "next-code-config-types",
  "next-code-core",
@@ -6543,6 +6545,7 @@ dependencies = [
  "next-code-batch-types",
  "next-code-best-of-n",
  "next-code-build-meta",
+ "next-code-command-risk",
  "next-code-compaction-core",
  "next-code-config-types",
  "next-code-core",
@@ -6647,6 +6650,14 @@ dependencies = [
  "next-code-storage",
  "serde",
  "serde_json",
+ "tempfile",
+]
+
+[[package]]
+name = "next-code-command-risk"
+version = "0.1.0"
+dependencies = [
+ "serde",
  "tempfile",
 ]
 
@@ -6955,6 +6966,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "next-code-batch-types",
+ "next-code-command-risk",
  "next-code-config-types",
  "next-code-message-types",
  "next-code-plan",
@@ -7550,6 +7562,7 @@ dependencies = [
  "next-code-agent-runtime",
  "next-code-app-core",
  "next-code-build-meta",
+ "next-code-command-risk",
  "next-code-config-types",
  "next-code-core",
  "next-code-experiment-flags",

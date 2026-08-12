@@ -1549,6 +1549,9 @@ pub enum ServerEvent {
         /// Best-effort tool call id for ACP ToolCallUpdate (may be empty).
         #[serde(default)]
         tool_call_id: String,
+        /// Command-risk justification for the decision (NX-PERM-002), if any.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        finding: Option<next_code_command_risk::RiskFinding>,
     },
 
     /// Best-of-N run progress (candidate cards / status strip).

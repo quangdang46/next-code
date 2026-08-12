@@ -540,6 +540,11 @@ pub trait TuiState {
         None
     }
 
+    /// Command-risk justification for the pending permission (NX-PERM-002).
+    fn pending_permission_finding(&self) -> Option<&next_code_command_risk::RiskFinding> {
+        None
+    }
+
     /// Teammate view: session_id being viewed (None = not in teammate view).
     fn viewing_teammate_session_id(&self) -> Option<&str> {
         None

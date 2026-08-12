@@ -1,9 +1,9 @@
-use crate::env::{product_env};
 use super::{StdinInputRequest, Tool, ToolContext, ToolExecutionMode, ToolOutput};
 use crate::background::TaskResult;
 use crate::bus::{
     BackgroundTaskProgress, BackgroundTaskProgressKind, BackgroundTaskProgressSource,
 };
+use crate::env::product_env;
 use crate::stdin_detect::{self, StdinState};
 use crate::util::truncate_str;
 use anyhow::Result;
@@ -453,7 +453,8 @@ async fn handle_background_output_line(
         }
         Ok(None) => {}
         Err(err) => {
-            let warning = format!("[next-code warning] failed to parse background progress: {err}\n");
+            let warning =
+                format!("[next-code warning] failed to parse background progress: {err}\n");
             file.write_all(warning.as_bytes()).await.ok();
             file.flush().await.ok();
         }
@@ -689,14 +690,14 @@ async fn await_bash_command_permission(params: &BashInput, ctx: &ToolContext) ->
         crate::dcg_bridge::BridgeDecision::Prompt {
             reason,
             allow_once_code,
+            finding,
             ..
         } => {
             let mut tool_input = serde_json::json!({
                 "command": params.command,
             });
             if let Some(ref dir) = ctx.working_dir {
-                tool_input["cwd"] =
-                    serde_json::Value::String(dir.to_string_lossy().into_owned());
+                tool_input["cwd"] = serde_json::Value::String(dir.to_string_lossy().into_owned());
             }
             crate::bus::Bus::global().publish(crate::bus::BusEvent::PermissionRequested(
                 crate::bus::PermissionRequested {
@@ -706,6 +707,7 @@ async fn await_bash_command_permission(params: &BashInput, ctx: &ToolContext) ->
                     allow_once_code,
                     alternatives: vec![],
                     tool_input: Some(tool_input),
+                    finding: finding.clone(),
                 },
             ));
 
@@ -717,14 +719,8 @@ async fn await_bash_command_permission(params: &BashInput, ctx: &ToolContext) ->
                     }
                     Ok(())
                 }
-                Ok(false) => Err(anyhow::anyhow!(
-                    "Command denied by user: {}",
-                    reason
-                )),
-                Err(e) => Err(anyhow::anyhow!(
-                    "Command permission cancelled: {}",
-                    e
-                )),
+                Ok(false) => Err(anyhow::anyhow!("Command denied by user: {}", reason)),
+                Err(e) => Err(anyhow::anyhow!("Command permission cancelled: {}", e)),
             }
         }
     }

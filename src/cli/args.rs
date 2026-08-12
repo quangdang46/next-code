@@ -1161,6 +1161,12 @@ pub(crate) enum PermissionCommand {
         /// Mode name: default, accept-edits, plan, auto, dont-ask, bypass-permissions
         mode: String,
     },
+    /// Print the command-risk finding (RiskLevel + justification) for a shell
+    /// command without executing anything (NX-PERM-002)
+    Explain {
+        /// The shell command to classify
+        command: String,
+    },
 }
 
 #[derive(Subcommand, Debug)]

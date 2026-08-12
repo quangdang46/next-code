@@ -26,6 +26,7 @@ members = [
     "crates/next-code-background-types",
     "crates/next-code-batch-types",
     "crates/next-code-build-support",
+    "crates/next-code-command-risk",
     "crates/next-code-compaction-core",
     "crates/next-code-config-types",
     "crates/next-code-core",
@@ -269,6 +270,7 @@ url = "2"
 open = "5"               # Open URLs in browser
 next-code-auth-types = { path = "crates/next-code-auth-types" }
 next-code-azure-auth = { path = "crates/next-code-azure-auth" }
+next-code-command-risk = { path = "crates/next-code-command-risk" }
 next-code-agent-runtime = { path = "crates/next-code-agent-runtime" }
 next-code-ambient-types = { path = "crates/next-code-ambient-types" }
 next-code-notify-email = { path = "crates/next-code-notify-email" }

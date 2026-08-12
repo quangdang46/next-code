@@ -98,6 +98,7 @@ image = { version = "0.25", default-features = false, features = ["png", "jpeg"]
 next-code-background-types = { path = "../next-code-background-types" }
 next-code-batch-types = { path = "../next-code-batch-types" }
 next-code-build-meta = { path = "../next-code-build-meta" }
+next-code-command-risk = { path = "../next-code-command-risk" }
 next-code-compaction-core = { path = "../next-code-compaction-core" }
 next-code-config-types = { path = "../next-code-config-types" }
 next-code-experiment-flags = { path = "../next-code-experiment-flags" }

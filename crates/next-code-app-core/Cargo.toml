@@ -113,6 +113,7 @@ next-code-build-meta = { path = "../next-code-build-meta" }
 # Re-exported via `pub use next_code_base::*` in lib.rs. default-features=false so
 # this crate controls next-code-base's optional features (see [features] below).
 next-code-base = { path = "../next-code-base", default-features = false }
+next-code-command-risk = { path = "../next-code-command-risk" }
 next-code-keywords = { path = "../next-code-keywords" }
 next-code-experiment-flags = { path = "../next-code-experiment-flags" }
 next-code-compaction-core = { path = "../next-code-compaction-core" }
