@@ -106,6 +106,7 @@ impl MultiProvider {
             LoginProviderTarget::Copilot => Some("copilot"),
             LoginProviderTarget::Gemini => Some("gemini"),
             LoginProviderTarget::Antigravity => Some("antigravity"),
+            LoginProviderTarget::GrokBuild => Some("grok-build"),
             LoginProviderTarget::AutoImport
             | LoginProviderTarget::Azure
             | LoginProviderTarget::Google => None,
@@ -442,6 +443,7 @@ impl MultiProvider {
                 ModelRouteApiMethod::Copilot => return format!("copilot:{model}"),
                 ModelRouteApiMethod::Cursor => return format!("cursor:{model}"),
                 ModelRouteApiMethod::Bedrock => return format!("bedrock:{model}"),
+                ModelRouteApiMethod::GrokBuild => return format!("grok-build:{model}"),
                 ModelRouteApiMethod::AntigravityHttps => return format!("antigravity:{model}"),
                 ModelRouteApiMethod::OpenAiCompatible { profile_id: None }
                 | ModelRouteApiMethod::CodeAssistOAuth

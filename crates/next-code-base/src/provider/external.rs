@@ -39,6 +39,9 @@ pub const ANTHROPIC_RUNTIME: &str = "anthropic";
 /// Registry key for the OpenAI (Codex) provider runtime.
 pub const OPENAI_RUNTIME: &str = "openai";
 
+/// Registry key for the Grok Build ACP provider runtime.
+pub const GROK_RUNTIME: &str = "grok-build";
+
 /// Construction spec for the OpenRouter / OpenAI-compatible runtime family.
 /// Unlike the other providers, one concrete runtime type serves several
 /// distinct identities (the real OpenRouter aggregator, a pinned OpenRouter

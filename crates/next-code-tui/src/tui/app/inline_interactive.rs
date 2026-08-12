@@ -102,6 +102,7 @@ fn route_supports_reasoning_effort(api_method: &str) -> bool {
         | Method::Copilot
         | Method::Cursor
         | Method::Bedrock
+        | Method::GrokBuild
         | Method::CodeAssistOAuth
         | Method::AntigravityHttps
         | Method::RemoteCatalog

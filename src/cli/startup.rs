@@ -148,6 +148,10 @@ pub fn register_external_provider_runtimes() {
         || std::sync::Arc::new(next_code_provider_antigravity_runtime::AntigravityProvider::new()),
     );
     crate::provider::external::register_external_provider(
+        crate::provider::external::GROK_RUNTIME,
+        || std::sync::Arc::new(next_code_provider_grok_runtime::GrokBuildProvider::new()),
+    );
+    crate::provider::external::register_external_provider(
         crate::provider::external::CLAUDE_CLI_RUNTIME,
         || std::sync::Arc::new(next_code_provider_claude_cli_runtime::ClaudeProvider::new()),
     );
@@ -437,6 +441,7 @@ mod tests {
                 crate::provider::external::ANTIGRAVITY_RUNTIME,
                 "antigravity",
             ),
+            (crate::provider::external::GROK_RUNTIME, "grok-build"),
         ] {
             assert!(
                 crate::provider::external::external_provider_registered(key),

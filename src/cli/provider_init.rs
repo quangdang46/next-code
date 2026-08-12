@@ -68,6 +68,7 @@ pub enum ProviderChoice {
     GeminiApi,
     Antigravity,
     Google,
+    GrokBuild,
     Auto,
 }
 
@@ -118,6 +119,7 @@ impl ProviderChoice {
             Self::GeminiApi => "gemini-api",
             Self::Antigravity => "antigravity",
             Self::Google => "google",
+            Self::GrokBuild => "grok-build",
             Self::Auto => "auto",
         }
     }
@@ -178,6 +180,7 @@ impl ProviderChoice {
             }
             "antigravity" => Self::Antigravity,
             "google" => Self::Google,
+            "grok-build" | "grok_build" => Self::GrokBuild,
             "auto" => Self::Auto,
             _ => return None,
         })
@@ -373,6 +376,10 @@ const PROVIDER_CHOICE_LOGIN_PROVIDERS: &[(ProviderChoice, LoginProviderDescripto
     (
         ProviderChoice::Google,
         crate::provider_catalog::GOOGLE_LOGIN_PROVIDER,
+    ),
+    (
+        ProviderChoice::GrokBuild,
+        crate::provider_catalog::GROK_BUILD_LOGIN_PROVIDER,
     ),
 ];
 
@@ -1314,6 +1321,19 @@ pub async fn login_and_bootstrap_provider(
         LoginProviderTarget::Google => {
             anyhow::bail!("Google login cannot be used as a model provider bootstrap");
         }
+        LoginProviderTarget::GrokBuild => {
+            disable_subscription_runtime_mode();
+            unlock_model_provider();
+            crate::env::set_var("NEXT_CODE_ACTIVE_PROVIDER", "grok-build");
+            provider::external::instantiate_external_provider(
+                provider::external::GROK_RUNTIME,
+            )
+            .ok_or_else(|| {
+                anyhow::anyhow!(
+                    "Grok Build runtime is not registered. Install the Grok CLI and run `grok login` first."
+                )
+            })?
+        }
     };
 
     Ok(runtime)
@@ -1591,6 +1611,19 @@ async fn init_provider_with_options(
             );
             unlock_model_provider();
             Arc::new(provider::MultiProvider::new_fast())
+        }
+        ProviderChoice::GrokBuild => {
+            disable_subscription_runtime_mode();
+            unlock_model_provider();
+            crate::env::set_var("NEXT_CODE_ACTIVE_PROVIDER", "grok-build");
+            provider::external::instantiate_external_provider(
+                provider::external::GROK_RUNTIME,
+            )
+            .ok_or_else(|| {
+                anyhow::anyhow!(
+                    "Grok Build runtime is not registered. Install the Grok CLI and run `grok login` first."
+                )
+            })?
         }
         ProviderChoice::Auto => {
             disable_subscription_runtime_mode_preserving_active_provider_profile();

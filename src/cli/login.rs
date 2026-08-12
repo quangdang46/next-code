@@ -296,6 +296,8 @@ pub async fn run_login_provider(
                     .await
                     .map(|_| LoginFlowOutcome::Completed)
             }
+            LoginProviderTarget::GrokBuild => login_grok_build_flow()
+                .map(|_| LoginFlowOutcome::Completed),
         }
     };
     let outcome = match login_result {
@@ -1045,6 +1047,30 @@ async fn login_antigravity_flow(no_browser: bool) -> Result<()> {
         eprintln!("Resolved Antigravity project: {}", project_id);
     }
     Ok(())
+}
+
+fn login_grok_build_flow() -> Result<()> {
+    let cli = crate::auth::grok_build::cli_path();
+    eprintln!("Grok Build uses the Grok CLI's own subscription login.");
+    eprintln!("Running `{cli} login` (credential stays owned by the Grok CLI)...");
+    let status = std::process::Command::new(&cli)
+        .arg("login")
+        .stdin(std::process::Stdio::inherit())
+        .stdout(std::process::Stdio::inherit())
+        .stderr(std::process::Stdio::inherit())
+        .status()
+        .with_context(|| {
+            format!(
+                "Failed to launch '{}'. Install the Grok CLI (see https://github.com/xai-org/grok) and ensure it is on PATH.",
+                cli
+            )
+        })?;
+    if status.success() {
+        eprintln!("Logged in to Grok Build via the Grok CLI.");
+        Ok(())
+    } else {
+        anyhow::bail!("`{} login` exited with {}", cli, status)
+    }
 }
 
 async fn login_gemini_flow(no_browser: bool) -> Result<()> {

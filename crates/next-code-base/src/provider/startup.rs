@@ -220,6 +220,7 @@ impl MultiProvider {
             cursor: cursor_provider.is_some(),
             bedrock: bedrock_provider.is_some(),
             openrouter: openrouter.is_some(),
+            grok_build: auth::grok_build::cli_available(),
             copilot_premium_zero,
         };
         let mut active = Self::auto_default_provider(availability);
@@ -286,6 +287,7 @@ impl MultiProvider {
             openai: RwLock::new(openai),
             copilot_api: RwLock::new(copilot_api),
             antigravity: RwLock::new(antigravity_provider),
+            grok_build: RwLock::new(None),
             gemini: RwLock::new(gemini_provider),
             cursor: RwLock::new(cursor_provider),
             bedrock: RwLock::new(bedrock_provider),

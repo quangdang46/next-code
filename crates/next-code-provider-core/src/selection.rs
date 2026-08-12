@@ -11,6 +11,7 @@ pub enum ActiveProvider {
     Cursor,
     Bedrock,
     OpenRouter,
+    GrokBuild,
 }
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug, Default)]
@@ -23,6 +24,7 @@ pub struct ProviderAvailability {
     pub cursor: bool,
     pub bedrock: bool,
     pub openrouter: bool,
+    pub grok_build: bool,
     pub copilot_premium_zero: bool,
 }
 
@@ -37,6 +39,7 @@ impl ProviderAvailability {
             ActiveProvider::Cursor => self.cursor,
             ActiveProvider::Bedrock => self.bedrock,
             ActiveProvider::OpenRouter => self.openrouter,
+            ActiveProvider::GrokBuild => self.grok_build,
         }
     }
 }
@@ -60,6 +63,8 @@ pub fn auto_default_provider(availability: ProviderAvailability) -> ActiveProvid
         ActiveProvider::Bedrock
     } else if availability.openrouter {
         ActiveProvider::OpenRouter
+    } else if availability.grok_build {
+        ActiveProvider::GrokBuild
     } else {
         ActiveProvider::Claude
     }
@@ -75,6 +80,7 @@ pub fn parse_provider_hint(value: &str) -> Option<ActiveProvider> {
         "cursor" => Some(ActiveProvider::Cursor),
         "bedrock" | "aws-bedrock" | "aws_bedrock" => Some(ActiveProvider::Bedrock),
         "openrouter" => Some(ActiveProvider::OpenRouter),
+        "grok-build" | "grok_build" => Some(ActiveProvider::GrokBuild),
         _ => None,
     }
 }
@@ -89,6 +95,7 @@ pub fn provider_label(provider: ActiveProvider) -> &'static str {
         ActiveProvider::Cursor => "Cursor",
         ActiveProvider::Bedrock => "AWS Bedrock",
         ActiveProvider::OpenRouter => "OpenRouter",
+        ActiveProvider::GrokBuild => "Grok Build",
     }
 }
 
@@ -102,6 +109,7 @@ pub fn provider_key(provider: ActiveProvider) -> &'static str {
         ActiveProvider::Cursor => "cursor",
         ActiveProvider::Bedrock => "bedrock",
         ActiveProvider::OpenRouter => "openrouter",
+        ActiveProvider::GrokBuild => "grok-build",
     }
 }
 
@@ -115,6 +123,7 @@ pub fn provider_from_model_key(key: &str) -> Option<ActiveProvider> {
         "cursor" => Some(ActiveProvider::Cursor),
         "bedrock" => Some(ActiveProvider::Bedrock),
         "openrouter" => Some(ActiveProvider::OpenRouter),
+        "grok-build" | "grok_build" => Some(ActiveProvider::GrokBuild),
         _ => None,
     }
 }
@@ -153,6 +162,7 @@ pub fn cli_provider_arg_for_session_key(key: &str) -> Option<&'static str> {
         "cursor" => Some("cursor"),
         "bedrock" => Some("bedrock"),
         "antigravity" => Some("antigravity"),
+        "grok-build" => Some("grok-build"),
         "code-assist-oauth" | "google" => Some("google"),
         // openai-compatible / custom profiles, remote-catalog, current, and any
         // unknown key have no clean standalone CLI provider value (they need a
@@ -188,6 +198,8 @@ pub fn explicit_model_provider_prefix(model: &str) -> Option<(ActiveProvider, &'
         Some((ActiveProvider::Bedrock, "bedrock:", rest))
     } else if let Some(rest) = model.strip_prefix("openrouter:") {
         Some((ActiveProvider::OpenRouter, "openrouter:", rest))
+    } else if let Some(rest) = model.strip_prefix("grok-build:") {
+        Some((ActiveProvider::GrokBuild, "grok-build:", rest))
     } else {
         None
     }
@@ -365,6 +377,16 @@ pub fn fallback_sequence(active: ActiveProvider) -> Vec<ActiveProvider> {
             ActiveProvider::Antigravity,
             ActiveProvider::Gemini,
             ActiveProvider::Cursor,
+        ],
+        ActiveProvider::GrokBuild => vec![
+            ActiveProvider::GrokBuild,
+            ActiveProvider::Claude,
+            ActiveProvider::OpenAI,
+            ActiveProvider::Copilot,
+            ActiveProvider::Gemini,
+            ActiveProvider::Cursor,
+            ActiveProvider::Bedrock,
+            ActiveProvider::OpenRouter,
         ],
     }
 }

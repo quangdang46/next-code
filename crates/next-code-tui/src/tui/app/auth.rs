@@ -438,6 +438,12 @@ impl App {
                         .to_string(),
                 ));
             }
+            crate::provider_catalog::LoginProviderTarget::GrokBuild => {
+                self.push_display_message(DisplayMessage::system(
+                    "Grok Build login is handled by the Grok CLI. Run `grok login` to sign in."
+                        .to_string(),
+                ));
+            }
         }
     }
 

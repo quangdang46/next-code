@@ -61,6 +61,7 @@ members = [
     "crates/next-code-provider-copilot-runtime",
     "crates/next-code-provider-cursor-runtime",
     "crates/next-code-provider-gemini-runtime",
+    "crates/next-code-provider-grok-runtime",
     "crates/next-code-provider-openai-runtime",
     "crates/next-code-provider-openrouter-runtime",
     "crates/next-code-llm-core",
@@ -194,6 +195,7 @@ next-code-provider-claude-cli-runtime = { path = "crates/next-code-provider-clau
 next-code-provider-copilot-runtime = { path = "crates/next-code-provider-copilot-runtime" }
 next-code-provider-cursor-runtime = { path = "crates/next-code-provider-cursor-runtime" }
 next-code-provider-gemini-runtime = { path = "crates/next-code-provider-gemini-runtime" }
+next-code-provider-grok-runtime = { path = "crates/next-code-provider-grok-runtime" }
 next-code-provider-openai-runtime = { path = "crates/next-code-provider-openai-runtime" }
 next-code-provider-openrouter-runtime = { path = "crates/next-code-provider-openrouter-runtime" }
 next-code-provider-service = { path = "crates/next-code-provider-service" }
