@@ -1025,6 +1025,97 @@ fn new_session_fork_reloads_changed_config_provider_and_model() {
     });
 }
 
+/// Regression for R1: a bare model picked while an OpenAI-compatible profile is
+/// active must route to that profile, NOT fall through to the real OpenRouter
+/// runtime (which would bail "OPENROUTER_API_KEY not found" or silently rebind).
+///
+/// Uses a hand-built `MultiProvider` with a stub compatible-profile runtime so
+/// the routing decision is tested directly without constructing the heavyweight
+/// OpenRouter runtime (which is network/catalog-bound and hangs the test).
+#[test]
+fn bare_model_with_active_openai_compatible_profile_routes_to_profile_not_openrouter() {
+    with_clean_provider_test_env(|| {
+        let rt = enter_test_runtime();
+        let _runtime_guard = rt.enter();
+
+        let opencode_runtime: Arc<dyn Provider> = Arc::new(StubExternalRuntime::new(
+            "opencode",
+            "OpenCode Zen",
+            "openai-compatible:opencode",
+            &["kimi-k2.6", "zen-live-only-model"],
+        ));
+        let mut profiles = std::collections::HashMap::new();
+        profiles.insert("opencode".to_string(), Arc::clone(&opencode_runtime));
+
+        let provider = MultiProvider {
+            claude: RwLock::new(None),
+            anthropic: RwLock::new(None),
+            openai: RwLock::new(None),
+            copilot_api: RwLock::new(None),
+            antigravity: RwLock::new(None),
+            grok_build: RwLock::new(None),
+            gemini: RwLock::new(None),
+            cursor: RwLock::new(None),
+            bedrock: RwLock::new(None),
+            openrouter: RwLock::new(Some(opencode_runtime)),
+            openai_compatible_profiles: RwLock::new(profiles),
+            active_openai_compatible_profile: RwLock::new(Some("opencode".to_string())),
+            active: RwLock::new(ActiveProvider::OpenRouter),
+            use_claude_cli: false,
+            startup_notices: RwLock::new(Vec::new()),
+            forced_provider: None,
+            routes_memo: std::sync::Mutex::new(None),
+        };
+
+        // No OPENROUTER_API_KEY: bare set_model must route to the active profile
+        // (the opencode stub), not clear the profile / rebind the openrouter slot.
+        crate::env::remove_var("OPENROUTER_API_KEY");
+        // The profile-routing path checks `openai_compatible_profile_is_configured`,
+        // so provide the opencode key (the profile itself is what must win, not
+        // the absence of OpenRouter credentials).
+        crate::env::set_var("OPENCODE_API_KEY", "oc-test-opencode");
+        crate::auth::AuthStatus::invalidate_cached_status();
+        provider
+            .set_model("kimi-k2.6")
+            .expect("bare model on active profile must route to the profile");
+        assert_eq!(
+            provider.active_openai_compatible_profile.read().unwrap().as_deref(),
+            Some("opencode"),
+            "active compatible profile must not be cleared by a bare set_model"
+        );
+        assert_eq!(
+            provider.model(),
+            "kimi-k2.6",
+            "bare set_model must set the model on the active profile runtime"
+        );
+    });
+}
+
+/// Regression for R3: an active Copilot provider must keep a dotted model on
+/// Copilot instead of re-normalizing it and routing to Anthropic.
+#[test]
+fn dotted_model_with_active_copilot_keeps_copilot_provider() {
+    with_clean_provider_test_env(|| {
+        let rt = enter_test_runtime();
+        let _runtime_guard = rt.enter();
+        let provider = test_multi_provider_with_cursor();
+        // Simulate an active Copilot provider.
+        let copilot = test_copilot_runtime();
+        *provider.copilot_api.write().unwrap() = Some(copilot as Arc<dyn Provider>);
+        *provider.active.write().unwrap() = ActiveProvider::Copilot;
+
+        provider
+            .set_model("claude-sonnet-4.6")
+            .expect("dotted model on active Copilot must route to Copilot");
+        assert_eq!(
+            provider.active_provider(),
+            ActiveProvider::Copilot,
+            "active provider must remain Copilot after a dotted model switch"
+        );
+        assert_eq!(provider.model(), "claude-sonnet-4.6");
+    });
+}
+
 include!("tests/auth_refresh.rs");
 include!("tests/model_resolution.rs");
 include!("tests/fallback_failover.rs");
