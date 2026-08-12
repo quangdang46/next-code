@@ -55,6 +55,15 @@ pub fn is_openai_api_only_pro_model(model: &str) -> bool {
                 .any(|pro| trimmed.to_ascii_lowercase().starts_with(&format!("{pro}-"))))
 }
 
+/// True when `model` is an API-only Pro model being routed through an OpenAI
+/// OAuth/chatgpt route (`openai-oauth`). Such models are rejected by the
+/// ChatGPT/Codex OAuth backend, so the OAuth route must never make them
+/// selectable. The API-key routes (`openai-api`, `openai-api-key`,
+/// `openai-platform`) and every other route pass through unchanged.
+pub fn is_openai_api_only_pro_model_for_route(model: &str, api_method: &str) -> bool {
+    is_openai_api_only_pro_model(model) && api_method == "openai-oauth"
+}
+
 pub const ALL_OPENAI_MODELS: &[&str] = &[
     DEFAULT_OPENAI_MODEL,
     "gpt-5.6-pro",
@@ -454,6 +463,41 @@ mod gpt_5_6_catalog_tests {
         }
         assert!(is_openai_api_only_pro_model("gpt-5.6-pro"));
         assert!(!is_openai_api_only_pro_model("gpt-5.6-sol"));
+    }
+
+    /// The route-composed predicate is the single source of truth for gating
+    /// Pro models off the ChatGPT/Codex OAuth route: every API-only Pro model
+    /// must be rejected on `openai-oauth` and accepted on every API-key route,
+    /// while non-Pro models and the ChatGPT-web alias stay routable.
+    #[test]
+    fn api_only_pro_models_are_gated_off_the_oauth_route_only() {
+        for pro in OPENAI_API_ONLY_PRO_MODELS {
+            assert!(
+                is_openai_api_only_pro_model_for_route(pro, "openai-oauth"),
+                "{pro} must be gated off the openai-oauth route"
+            );
+        }
+        for api_method in ["openai-api-key", "openai-api", "openai-platform", "openai"] {
+            for pro in OPENAI_API_ONLY_PRO_MODELS {
+                assert!(
+                    !is_openai_api_only_pro_model_for_route(pro, api_method),
+                    "{pro} must stay routable on {api_method}"
+                );
+            }
+        }
+        for model in ["gpt-5.6", "gpt-5.6-sol", "gpt-5.5", "gpt-5.6-terra", "gpt-5.6-luna"] {
+            assert!(
+                !is_openai_api_only_pro_model_for_route(model, "openai-oauth"),
+                "{model} is not an API-only Pro model and must stay on the oauth route"
+            );
+        }
+        // The `[web]` alias is the ChatGPT-OAuth-valid spelling of the Pro model;
+        // it must never be gated as if it were the API-only id.
+        assert!(!is_openai_api_only_pro_model("gpt-5.6-pro[web]"));
+        assert!(!is_openai_api_only_pro_model_for_route(
+            "gpt-5.6-pro[web]",
+            "openai-oauth"
+        ));
     }
 }
 

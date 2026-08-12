@@ -521,6 +521,25 @@ mod tests {
         assert_eq!(explicit_model_provider_prefix("unknown:sonnet"), None);
     }
 
+    /// Session-spec parsing is intentionally NOT the rejection seam for
+    /// API-only Pro models: `openai-oauth:gpt-5.6-pro` must keep parsing so the
+    /// "requires platform API key" affordance stays visible in the UI. The
+    /// actual gate lives in route building / availability / set_model.
+    #[test]
+    fn explicit_model_provider_prefix_parses_pro_model_route_specs() {
+        let (provider, prefix, model) = explicit_model_provider_prefix("openai-oauth:gpt-5.6-pro")
+            .expect("oauth pro spec must keep parsing so the route stays visible");
+        assert_eq!(provider, ActiveProvider::OpenAI);
+        assert_eq!(prefix, "openai-oauth:");
+        assert_eq!(model, "gpt-5.6-pro");
+
+        let (provider, prefix, model) = explicit_model_provider_prefix("openai-api:gpt-5.6-pro")
+            .expect("api-key pro spec must parse");
+        assert_eq!(provider, ActiveProvider::OpenAI);
+        assert_eq!(prefix, "openai-api:");
+        assert_eq!(model, "gpt-5.6-pro");
+    }
+
     #[test]
     fn dedupes_model_routes_by_route_identity() {
         let routes = vec![

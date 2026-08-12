@@ -18,7 +18,7 @@ use catalog_service::{ModelCatalogService, RuntimeModelUnavailability};
 use next_code_provider_core::{
     ALL_CLAUDE_MODELS, ALL_OPENAI_MODELS, ModelCapabilities, ModelRoute,
     context_limit_for_model_with_provider_and_cache, core_provider_for_model_with_hint,
-    provider_key_from_hint, shared_http_client,
+    is_openai_api_only_pro_model, provider_key_from_hint, shared_http_client,
 };
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
@@ -916,6 +916,24 @@ pub fn is_model_available_for_account(model: &str) -> Option<bool> {
 }
 
 pub fn model_availability_for_account(model: &str) -> AccountModelAvailability {
+    // GPT Pro models are API-key-only. The ChatGPT/Codex OAuth backend rejects
+    // them ("not supported when using Codex with a ChatGPT account"), so
+    // without a platform API key they are never available regardless of what
+    // the OAuth-scoped account snapshot says. This is the FIRST check so the
+    // OAuth catalog can never un-gate them.
+    if is_openai_api_only_pro_model(model)
+        && !crate::auth::AuthStatus::check_fast().openai_has_api_key
+    {
+        return AccountModelAvailability {
+            state: AccountModelAvailabilityState::Unavailable,
+            reason: Some(
+                "requires an OpenAI platform API key (rejected by ChatGPT/Codex login)".to_string(),
+            ),
+            source: "api-key-only",
+            observed_at: account_models_observed_at(),
+        };
+    }
+
     if let Some(runtime) = runtime_model_unavailability(model) {
         return AccountModelAvailability {
             state: AccountModelAvailabilityState::Unavailable,
@@ -975,6 +993,14 @@ const OPENAI_MODEL_PREFERENCE: &[&str] = &[
 
 /// Get the best available OpenAI model, falling back through the preference list.
 /// Returns None if the dynamic model list hasn't been fetched yet.
+/// API-only Pro models are only usable as an auto-selected fallback when the
+/// user has an OpenAI platform API key; on OAuth-only credentials they would be
+/// rejected by the ChatGPT/Codex backend.
+fn openai_fallback_model_usable(model: &str) -> bool {
+    !is_openai_api_only_pro_model(model)
+        || crate::auth::AuthStatus::check_fast().openai_has_api_key
+}
+
 pub fn get_best_available_openai_model() -> Option<String> {
     if !account_model_cache_is_fresh() {
         return None;
@@ -985,6 +1011,7 @@ pub fn get_best_available_openai_model() -> Option<String> {
     for preferred in OPENAI_MODEL_PREFERENCE {
         if models.iter().any(|model| model == *preferred)
             && runtime_model_unavailability(preferred).is_none()
+            && openai_fallback_model_usable(preferred)
         {
             return Some(preferred.to_string());
         }
@@ -992,7 +1019,9 @@ pub fn get_best_available_openai_model() -> Option<String> {
 
     models
         .into_iter()
-        .find(|model| runtime_model_unavailability(model).is_none())
+        .find(|model| {
+            runtime_model_unavailability(model).is_none() && openai_fallback_model_usable(model)
+        })
 }
 
 /// Return the context window size in tokens for a given model, if known.
