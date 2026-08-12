@@ -26,8 +26,46 @@ pub const ALL_CLAUDE_MODELS: &[&str] = &[
 
 /// Available OpenAI models used by model lists and provider routing.
 /// The list is curated best-first; position 0 is the quality-first default.
+pub const CHATGPT_WEB_MODEL: &str = "gpt-5.6-pro[web]";
+
+/// GPT Pro reasoning models. These are exposed only on the OpenAI platform
+/// API (`api.openai.com` with an `OPENAI_API_KEY`); the ChatGPT/Codex OAuth
+/// backend rejects them ("not supported when using Codex with a ChatGPT
+/// account"). Keep them in their own list so the OAuth-scoped Codex catalog
+/// can never hide them from the picker and so route building can mark them
+/// API-key-only.
+pub const OPENAI_API_ONLY_PRO_MODELS: &[&str] = &[
+    "gpt-5.6-pro",
+    "gpt-5.5-pro",
+    "gpt-5.4-pro",
+    "gpt-5.2-pro",
+    "gpt-5-pro",
+];
+
+/// True when `model` is a GPT Pro model that only works with an OpenAI
+/// platform API key (never ChatGPT/Codex OAuth).
+pub fn is_openai_api_only_pro_model(model: &str) -> bool {
+    let trimmed = model.trim();
+    OPENAI_API_ONLY_PRO_MODELS
+        .iter()
+        .any(|pro| trimmed.eq_ignore_ascii_case(pro))
+        || (trimmed.len() > 4
+            && OPENAI_API_ONLY_PRO_MODELS
+                .iter()
+                .any(|pro| trimmed.to_ascii_lowercase().starts_with(&format!("{pro}-"))))
+}
+
 pub const ALL_OPENAI_MODELS: &[&str] = &[
     DEFAULT_OPENAI_MODEL,
+    "gpt-5.6-pro",
+    // ChatGPT web-only route. The `[web]` suffix is intentionally part of the
+    // model id so it can never be mistaken for an API/Codex model with the same
+    // upstream slug.
+    CHATGPT_WEB_MODEL,
+    "gpt-5.6",
+    "gpt-5.6-terra",
+    "gpt-5.6-luna",
+    "gpt-5.5-pro",
     "gpt-5.5",
     "gpt-5.4",
     "gpt-5.4-pro",
@@ -317,6 +355,11 @@ pub fn open_weight_family_context_limit(model: &str) -> Option<usize> {
         return Some(262_144);
     }
 
+    // --- Meta Muse Spark family: 1 Mi tokens ---
+    if m.contains("muse-spark") {
+        return Some(1_048_576);
+    }
+
     // --- Alibaba GTE-Qwen2 retrieval models: 32K context ---
     if m.contains("gte-qwen") {
         return Some(32_768);
@@ -391,6 +434,27 @@ pub fn normalize_copilot_model_name(model: &str) -> Option<&'static str> {
         .chain(ALL_OPENAI_MODELS.iter())
         .find(|canonical| **canonical == normalized)
         .copied()
+}
+
+#[cfg(test)]
+mod gpt_5_6_catalog_tests {
+    use super::*;
+
+    #[test]
+    fn openai_catalog_exposes_the_complete_gpt_5_6_family() {
+        for model in [
+            "gpt-5.6-sol",
+            "gpt-5.6-pro",
+            "gpt-5.6-pro[web]",
+            "gpt-5.6",
+            "gpt-5.6-terra",
+            "gpt-5.6-luna",
+        ] {
+            assert!(ALL_OPENAI_MODELS.contains(&model), "missing {model}");
+        }
+        assert!(is_openai_api_only_pro_model("gpt-5.6-pro"));
+        assert!(!is_openai_api_only_pro_model("gpt-5.6-sol"));
+    }
 }
 
 #[cfg(test)]
