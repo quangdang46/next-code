@@ -291,6 +291,7 @@ impl Agent {
             let mut usage_cache_read: Option<u64> = None;
             let mut usage_cache_creation: Option<u64> = None;
             let mut saw_message_end = false;
+            let mut stream_cancelled = false;
             let mut stop_reason: Option<String> = None;
             let mut sdk_tool_results: std::collections::HashMap<String, (String, bool)> =
                 std::collections::HashMap::new();
@@ -335,6 +336,7 @@ impl Agent {
                         logging::info(
                             "Graceful shutdown/cancel while waiting for API stream event - stopping stream",
                         );
+                        stream_cancelled = true;
                         break;
                     }
                     event = next_event => event,
@@ -495,6 +497,7 @@ impl Agent {
                             });
                             text_content
                                 .push_str("\n\n[generation interrupted - server reloading]");
+                            stream_cancelled = true;
                             break;
                         }
                     }
@@ -996,7 +999,7 @@ impl Agent {
                     id: tc.id.clone(),
                     name: tc.name.clone(),
                     input: tc.input.clone(),
-                    thought_signature: None,
+                    thought_signature: tc.thought_signature.clone(),
                 });
             }
 
@@ -1061,19 +1064,25 @@ impl Agent {
 
             // If graceful shutdown was signaled during streaming and we have tool calls,
             // we need to provide tool results for them (API requires tool_use -> tool_result)
-            // then exit cleanly
-            if self.is_graceful_shutdown() {
+            // then exit cleanly. Cancelled streams never executed their tool calls; mark
+            // them as interrupted (non-error) so the model does not treat them as failures.
+            if self.is_graceful_shutdown() || stream_cancelled {
                 logging::info(&format!(
                     "Graceful shutdown - skipping {} tool call(s)",
                     tool_calls.len()
                 ));
+                let interrupted = stream_cancelled;
                 for tc in &tool_calls {
                     self.add_message(
                         Role::User,
                         vec![ContentBlock::ToolResult {
                             tool_use_id: tc.id.clone(),
-                            content: "[Skipped - server reloading]".to_string(),
-                            is_error: Some(true),
+                            content: if interrupted {
+                                "[Skipped: user interrupted]".to_string()
+                            } else {
+                                "[Skipped - server reloading]".to_string()
+                            },
+                            is_error: Some(interrupted),
                         }],
                     );
                 }
@@ -1155,7 +1164,7 @@ impl Agent {
                         name: tc.name.clone(),
                         output: error_msg.clone(),
                         error: Some(error_msg.clone()),
-                    metadata: None,
+                        metadata: None,
                     });
                     self.add_message(
                         Role::User,
@@ -1302,6 +1311,11 @@ impl Agent {
                                 Err(_) => None,
                             };
                         } else {
+                            // User cancelled (Esc / session cancel) while the tool
+                            // was running. The tool task is aborted below; record an
+                            // interruption notice as its ToolResult so the transcript
+                            // has no orphan ToolUse and the model does not fabricate
+                            // a failure next turn.
                             tool_result = None;
                         }
                     }
@@ -1402,7 +1416,7 @@ impl Agent {
                                 name: tc.name.clone(),
                                 output: error_msg.clone(),
                                 error: Some(error_msg.clone()),
-                            metadata: None,
+                                metadata: None,
                             });
 
                             self.add_message_with_duration(
@@ -1417,20 +1431,37 @@ impl Agent {
                             tool_results_dirty = true;
                         }
                     }
-                } else if self.is_graceful_shutdown() {
-                    // Server reload - abort tool and save interrupted result
+                } else if self.is_graceful_shutdown() || self.has_urgent_interrupt() {
+                    // Server reload or user cancel - abort tool and save interrupted result
+                    let user_cancelled = !self.is_graceful_shutdown();
                     logging::info(&format!(
-                        "Tool '{}' interrupted by server reload after {:.1}s",
+                        "Tool '{}' interrupted by {} after {:.1}s",
                         tc.name,
+                        if user_cancelled {
+                            "user cancel"
+                        } else {
+                            "server reload"
+                        },
                         tool_elapsed.as_secs_f64()
                     ));
                     tool_handle.abort();
 
                     // For selfdev reload and wait-like tools, the interruption is expected:
                     // selfdev initiated the restart, while wait-like tools should be resumed
-                    // after reload rather than treated as failed work.
-                    let (interrupted_msg, is_error) =
-                        reload_interrupted_tool_result(tc, tool_elapsed.as_secs_f64());
+                    // after reload rather than treated as failed work. A user cancel is
+                    // always a non-error interruption notice: the tool simply did not finish.
+                    let (interrupted_msg, is_error) = if user_cancelled {
+                        (
+                            format!(
+                                "[Skipped: user interrupted] Tool '{}' was cancelled after {:.1}s",
+                                tc.name,
+                                tool_elapsed.as_secs_f64()
+                            ),
+                            false,
+                        )
+                    } else {
+                        reload_interrupted_tool_result(tc, tool_elapsed.as_secs_f64())
+                    };
 
                     let _ = event_tx.send(ServerEvent::ToolDone {
                         id: tc.id.clone(),
@@ -1457,12 +1488,17 @@ impl Agent {
 
                     // Add results for any remaining tools too
                     for remaining_tc in &tool_calls[(tool_index + 1)..] {
+                        let (content, is_error) = if user_cancelled {
+                            ("[Skipped: user interrupted]".to_string(), false)
+                        } else {
+                            ("[Skipped - server reloading]".to_string(), true)
+                        };
                         self.add_message(
                             Role::User,
                             vec![ContentBlock::ToolResult {
                                 tool_use_id: remaining_tc.id.clone(),
-                                content: "[Skipped - server reloading]".to_string(),
-                                is_error: Some(true),
+                                content,
+                                is_error: Some(is_error),
                             }],
                         );
                     }
@@ -1479,7 +1515,9 @@ impl Agent {
                         tool_elapsed.as_secs_f64()
                     ));
 
-                    let display_name = tc.input.get("intent")
+                    let display_name = tc
+                        .input
+                        .get("intent")
                         .and_then(|v| v.as_str())
                         .unwrap_or(&tc.name)
                         .to_string();
@@ -1488,8 +1526,8 @@ impl Agent {
                             &tc.name,
                             Some(display_name),
                             &self.session.id,
-                            true,   // notify
-                            false,  // wake
+                            true,  // notify
+                            false, // wake
                             tool_handle,
                         )
                         .await;
@@ -1506,7 +1544,7 @@ impl Agent {
                         name: tc.name.clone(),
                         output: bg_msg.clone(),
                         error: None,
-                    metadata: None,
+                        metadata: None,
                     });
 
                     self.add_message_with_duration(
@@ -1567,6 +1605,34 @@ mod tests {
             input,
             intent: None,
             thought_signature: None,
+        }
+    }
+
+    #[test]
+    fn tool_use_blocks_preserve_thought_signature() {
+        // R9: the committed ContentBlock::ToolUse must carry the Gemini
+        // thought_signature so it survives persistence and replay. The
+        // committed block is built from the ToolCall captured during the stream.
+        let tc = ToolCall {
+            id: "call_gemini".to_string(),
+            name: "bash".to_string(),
+            input: json!({"command": "ls"}),
+            intent: None,
+            thought_signature: Some("sig-123".to_string()),
+        };
+        let block = ContentBlock::ToolUse {
+            id: tc.id.clone(),
+            name: tc.name.clone(),
+            input: tc.input.clone(),
+            thought_signature: tc.thought_signature.clone(),
+        };
+        match block {
+            ContentBlock::ToolUse {
+                thought_signature, ..
+            } => {
+                assert_eq!(thought_signature.as_deref(), Some("sig-123"));
+            }
+            other => panic!("expected ToolUse, got {other:?}"),
         }
     }
 

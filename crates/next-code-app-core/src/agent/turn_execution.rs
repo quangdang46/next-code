@@ -265,7 +265,9 @@ impl Agent {
                     let deny_reason = stats
                         .results
                         .iter()
-                        .find(|r| matches!(r.outcome, next_code_hooks::ClassifiedOutcome::Deny { .. }))
+                        .find(|r| {
+                            matches!(r.outcome, next_code_hooks::ClassifiedOutcome::Deny { .. })
+                        })
                         .map(|r| match &r.outcome {
                             next_code_hooks::ClassifiedOutcome::Deny { reason } => reason.clone(),
                             _ => String::new(),
@@ -296,9 +298,13 @@ impl Agent {
                 let dispatch_config = self.dispatch_config.clone();
                 tokio::spawn(async move {
                     let refs: Vec<&next_code_hooks::HookHandlerConfig> = handlers.iter().collect();
-                    let _ =
-                        next_code_hooks::dispatch_hooks(&event, &hook_input, &refs, &dispatch_config)
-                            .await;
+                    let _ = next_code_hooks::dispatch_hooks(
+                        &event,
+                        &hook_input,
+                        &refs,
+                        &dispatch_config,
+                    )
+                    .await;
                 });
             }
         }
@@ -931,10 +937,7 @@ impl Agent {
         let plan_mode = crate::dcg_bridge::session_mode(&self.session.id)
             .unwrap_or_else(crate::dcg_bridge::current_mode)
             == crate::dcg_bridge::Mode::Plan;
-        if plan_mode
-            && is_write_shaped_tool(name)
-            && tool_input_targets_plan_md(input)
-        {
+        if plan_mode && is_write_shaped_tool(name) && tool_input_targets_plan_md(input) {
             return Ok(());
         }
 
@@ -962,9 +965,7 @@ impl Agent {
                     ..
                 } => {
                     let reason = if plan_mode && is_write_shaped_tool(name) {
-                        format!(
-                            "{reason}. In plan mode only writes to plan.md are allowed."
-                        )
+                        format!("{reason}. In plan mode only writes to plan.md are allowed.")
                     } else {
                         reason
                     };
@@ -1088,6 +1089,10 @@ impl Agent {
             self.allowed_tools.clone(),
             self.disabled_tools.clone(),
         );
+        // Re-seed the session allow-list from `always_allow_tools` so tools the
+        // user previously marked as always-allow stay approved across a resume
+        // (create_agent seeds it; restore must too, R11).
+        crate::dcg_bridge::init_session_allow_list(&self.session.id);
         let assign_ms = assign_start.elapsed().as_millis();
 
         let reset_start = Instant::now();
@@ -1468,7 +1473,6 @@ impl Agent {
     }
 }
 
-
 /// Write-shaped tools that Plan mode normally blocks.
 pub(crate) fn is_shell_tool(name: &str) -> bool {
     matches!(
@@ -1537,7 +1541,9 @@ mod plan_mode_write_tests {
 
     #[test]
     fn plan_md_path_detection() {
-        assert!(tool_input_targets_plan_md(Some(&json!({ "path": "plan.md" }))));
+        assert!(tool_input_targets_plan_md(Some(
+            &json!({ "path": "plan.md" })
+        )));
         assert!(tool_input_targets_plan_md(Some(
             &json!({ "file_path": "/tmp/sessions/abc/plan.md" })
         )));
@@ -1550,4 +1556,3 @@ mod plan_mode_write_tests {
         assert!(!tool_input_targets_plan_md(None));
     }
 }
-
