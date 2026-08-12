@@ -1151,7 +1151,20 @@ pub const GOOGLE_LOGIN_PROVIDER: LoginProviderDescriptor = LoginProviderDescript
     order: LoginProviderSurfaceOrder::new(Some(13), None, None, None, None),
 };
 
-pub(crate) const LOGIN_PROVIDERS: [LoginProviderDescriptor; 49] = [
+pub const GROK_BUILD_LOGIN_PROVIDER: LoginProviderDescriptor = LoginProviderDescriptor {
+    id: "grok-build",
+    display_name: "Grok Build",
+    auth_kind: LoginProviderAuthKind::Cli,
+    auth_state_key: LoginProviderAuthStateKey::GrokBuild,
+    auth_status_method: "Grok CLI cached login",
+    aliases: &[],
+    menu_detail: "Grok Build subscription via installed Grok CLI",
+    recommended: false,
+    target: LoginProviderTarget::GrokBuild,
+    order: LoginProviderSurfaceOrder::new(None, Some(100), None, None, Some(100)),
+};
+
+pub(crate) const LOGIN_PROVIDERS: [LoginProviderDescriptor; 50] = [
     AUTO_IMPORT_LOGIN_PROVIDER,
     CLAUDE_LOGIN_PROVIDER,
     ANTHROPIC_API_LOGIN_PROVIDER,
@@ -1201,4 +1214,5 @@ pub(crate) const LOGIN_PROVIDERS: [LoginProviderDescriptor; 49] = [
     GEMINI_API_LOGIN_PROVIDER,
     ANTIGRAVITY_LOGIN_PROVIDER,
     GOOGLE_LOGIN_PROVIDER,
+    GROK_BUILD_LOGIN_PROVIDER,
 ];

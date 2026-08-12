@@ -6295,6 +6295,7 @@ dependencies = [
  "next-code-provider-doctor",
  "next-code-provider-gemini",
  "next-code-provider-gemini-runtime",
+ "next-code-provider-grok-runtime",
  "next-code-provider-metadata",
  "next-code-provider-openai",
  "next-code-provider-openai-runtime",
@@ -7226,6 +7227,23 @@ dependencies = [
  "tokio",
  "tokio-stream",
  "uuid",
+]
+
+[[package]]
+name = "next-code-provider-grok-runtime"
+version = "0.1.0"
+dependencies = [
+ "agent-client-protocol",
+ "anyhow",
+ "async-trait",
+ "futures",
+ "next-code-message-types",
+ "next-code-provider-core",
+ "serde_json",
+ "tempfile",
+ "tokio",
+ "tokio-stream",
+ "tokio-util",
 ]
 
 [[package]]

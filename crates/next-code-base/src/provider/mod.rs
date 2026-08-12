@@ -333,6 +333,11 @@ pub struct MultiProvider {
     /// `next-code-provider-antigravity-runtime` and is instantiated through
     /// `external::instantiate_external_provider`.
     antigravity: RwLock<Option<Arc<dyn Provider>>>,
+    /// Grok Build ACP provider (spawns the Grok CLI as the agent, hot-swappable
+    /// after the CLI login). Held as `dyn Provider`: the concrete runtime lives
+    /// downstream in `next-code-provider-grok-runtime` and is instantiated
+    /// through `external::instantiate_external_provider`.
+    grok_build: RwLock<Option<Arc<dyn Provider>>>,
     /// Gemini provider (hot-swappable after login). Held as `dyn Provider`:
     /// the concrete runtime lives downstream in `next-code-provider-gemini-runtime`
     /// and is instantiated through `external::instantiate_external_provider`.
@@ -1117,6 +1122,16 @@ impl MultiProvider {
                 self.set_active_provider(ActiveProvider::OpenRouter);
                 Ok(())
             }
+            ActiveProvider::GrokBuild => {
+                let Some(grok) = self.grok_build_provider() else {
+                    anyhow::bail!(
+                        "Grok Build provider not available. Install the Grok CLI and run `grok login` first."
+                    );
+                };
+                grok.set_model(model)?;
+                self.set_active_provider(ActiveProvider::GrokBuild);
+                Ok(())
+            }
         }
     }
 
@@ -1305,6 +1320,19 @@ impl MultiProvider {
                 .antigravity
                 .write()
                 .unwrap_or_else(|poisoned| poisoned.into_inner()) = Some(antigravity);
+        }
+
+        let already_has_grok_build = self.grok_build_provider().is_some();
+        if !already_has_grok_build
+            && crate::auth::grok_build::cli_available()
+            && let Some(grok) =
+                external::instantiate_expected_external_provider(external::GROK_RUNTIME)
+        {
+            crate::logging::info("Hot-initialized Grok Build provider after login");
+            *self
+                .grok_build
+                .write()
+                .unwrap_or_else(|poisoned| poisoned.into_inner()) = Some(grok);
         }
 
         let already_has_gemini = self.gemini_provider().is_some();
@@ -1525,6 +1553,7 @@ impl MultiProvider {
                 }
                 "openrouter"
             }
+            ActiveProvider::GrokBuild => "grok-build",
         };
         format!("{prefix}:{current_model}")
     }
@@ -1585,6 +1614,7 @@ impl Provider for MultiProvider {
             ActiveProvider::Cursor => "Cursor",
             ActiveProvider::Bedrock => "Bedrock",
             ActiveProvider::OpenRouter => "OpenRouter",
+            ActiveProvider::GrokBuild => "Grok Build",
         }
     }
 
@@ -1641,6 +1671,10 @@ impl Provider for MultiProvider {
                 .active_openrouter_execution_provider()
                 .map(|o| o.model())
                 .unwrap_or_else(|| "anthropic/claude-sonnet-4".to_string()),
+            ActiveProvider::GrokBuild => self
+                .grok_build_provider()
+                .map(|o| o.model())
+                .unwrap_or_else(|| "grok-4.5".to_string()),
         }
     }
 
@@ -1779,6 +1813,10 @@ impl Provider for MultiProvider {
                 .unwrap_or(false),
             ActiveProvider::OpenRouter => self
                 .active_openrouter_execution_provider()
+                .map(|provider| provider.supports_image_input())
+                .unwrap_or(false),
+            ActiveProvider::GrokBuild => self
+                .grok_build_provider()
                 .map(|provider| provider.supports_image_input())
                 .unwrap_or(false),
         }
@@ -1954,6 +1992,10 @@ impl Provider for MultiProvider {
             ActiveProvider::OpenRouter => self
                 .active_openrouter_execution_provider()
                 .map(|openrouter| openrouter.available_models_for_switching())
+                .unwrap_or_default(),
+            ActiveProvider::GrokBuild => self
+                .grok_build_provider()
+                .map(|grok| grok.available_models_for_switching())
                 .unwrap_or_default(),
         }
     }
@@ -2176,6 +2218,8 @@ impl Provider for MultiProvider {
                 .unwrap_or(false),
             ActiveProvider::Bedrock => false, // next-code executes Bedrock tool calls
             ActiveProvider::OpenRouter => false, // next-code executes tools
+            // Grok Build runs its own isolated ACP coding-tool loop internally.
+            ActiveProvider::GrokBuild => true,
         }
     }
 
@@ -2198,6 +2242,7 @@ impl Provider for MultiProvider {
             ActiveProvider::OpenRouter => self
                 .active_openrouter_execution_provider()
                 .and_then(|o| o.reasoning_effort()),
+            ActiveProvider::GrokBuild => None,
         }
     }
 
@@ -2371,6 +2416,10 @@ impl Provider for MultiProvider {
                 .active_openrouter_execution_provider()
                 .map(|o| o.supports_compaction())
                 .unwrap_or(false),
+            ActiveProvider::GrokBuild => self
+                .grok_build_provider()
+                .map(|o| o.supports_compaction())
+                .unwrap_or(false),
         }
     }
 
@@ -2410,6 +2459,7 @@ impl Provider for MultiProvider {
                 .active_openrouter_execution_provider()
                 .map(|o| o.uses_next_code_compaction())
                 .unwrap_or(false),
+            ActiveProvider::GrokBuild => false,
         }
     }
 
@@ -2516,6 +2566,9 @@ impl Provider for MultiProvider {
                     Err(anyhow::anyhow!("OpenRouter provider unavailable"))
                 }
             }
+            ActiveProvider::GrokBuild => Err(anyhow::anyhow!(
+                "Grok Build does not support native compaction"
+            )),
         }
     }
 
@@ -2579,6 +2632,10 @@ impl Provider for MultiProvider {
                 .unwrap_or(DEFAULT_CONTEXT_LIMIT),
             ActiveProvider::OpenRouter => self
                 .active_openrouter_execution_provider()
+                .map(|o| o.context_window())
+                .unwrap_or(DEFAULT_CONTEXT_LIMIT),
+            ActiveProvider::GrokBuild => self
+                .grok_build_provider()
                 .map(|o| o.context_window())
                 .unwrap_or(DEFAULT_CONTEXT_LIMIT),
         }
@@ -2651,6 +2708,7 @@ impl Provider for MultiProvider {
             openai: RwLock::new(openai),
             copilot_api: RwLock::new(copilot_api),
             antigravity: RwLock::new(antigravity_provider),
+            grok_build: RwLock::new(None),
             gemini: RwLock::new(gemini_provider),
             cursor: RwLock::new(cursor_provider),
             bedrock: RwLock::new(bedrock_provider),
@@ -2716,6 +2774,7 @@ impl Provider for MultiProvider {
             ActiveProvider::Cursor => None,
             ActiveProvider::Bedrock => None,
             ActiveProvider::OpenRouter => None,
+            ActiveProvider::GrokBuild => None,
         }
     }
 

@@ -29,6 +29,13 @@ impl MultiProvider {
             .clone()
     }
 
+    pub(super) fn grok_build_provider(&self) -> Option<Arc<dyn Provider>> {
+        self.grok_build
+            .read()
+            .unwrap_or_else(|poisoned| poisoned.into_inner())
+            .clone()
+    }
+
     pub(super) fn gemini_provider(&self) -> Option<Arc<dyn Provider>> {
         self.gemini
             .read()
@@ -90,6 +97,7 @@ impl MultiProvider {
             // then silently rerouted the request to another provider such as
             // OpenAI (issue #358).
             ActiveProvider::OpenRouter => self.active_openrouter_execution_provider().is_some(),
+            ActiveProvider::GrokBuild => self.grok_build_provider().is_some(),
         }
     }
 

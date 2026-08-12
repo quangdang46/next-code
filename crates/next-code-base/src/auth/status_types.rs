@@ -48,6 +48,8 @@ pub struct AuthStatus {
     pub google: AuthState,
     /// Google Gmail has send capability (Full tier)
     pub google_can_send: bool,
+    /// Grok Build subscription via the installed Grok CLI's cached login
+    pub grok_build: AuthState,
 }
 
 /// Auth state for Anthropic which has multiple auth methods
