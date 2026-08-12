@@ -40,7 +40,8 @@ pub use models::{
     ALL_CLAUDE_MODELS, ALL_OPENAI_MODELS, DEFAULT_CLAUDE_MODEL, DEFAULT_CONTEXT_LIMIT,
     DEFAULT_OPENAI_MODEL, ModelCapabilities, context_limit_for_model,
     context_limit_for_model_with_provider, context_limit_for_model_with_provider_and_cache,
-    is_listable_model_name, normalize_copilot_model_name,
+    is_listable_model_name, is_openai_api_only_pro_model, is_openai_api_only_pro_model_for_route,
+    normalize_copilot_model_name,
     provider_for_model as core_provider_for_model,
     provider_for_model_with_hint as core_provider_for_model_with_hint, provider_key_from_hint,
 };

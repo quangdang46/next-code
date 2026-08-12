@@ -961,19 +961,37 @@ impl OpenAIProvider {
                 if let Some(fallback) = next_code_base::provider::get_best_available_openai_model()
                     && fallback != current
                 {
-                    next_code_base::logging::info(&format!(
-                        "Model '{}' not available for account; falling back to '{}'",
-                        current, fallback
-                    ));
+                    // The availability gate already refuses API-only Pro models
+                    // for an OAuth-only credential (model_availability_for_account),
+                    // so `get_best_available_openai_model` never returns one here.
+                    // This guard is belt-and-braces for the async window between
+                    // credential reloads: never let an OAuth-mode session
+                    // auto-fall ONTO a model the ChatGPT/Codex backend rejects.
+                    if next_code_provider_core::is_openai_api_only_pro_model(&fallback)
+                        && {
+                            let creds = self.credentials.read().await;
+                            Self::is_chatgpt_mode(&creds)
+                        }
                     {
-                        let mut w = self.model.write().await;
-                        *w = fallback.clone();
+                        next_code_base::logging::info(&format!(
+                            "Fallback model '{}' is API-key-only and the current credential is ChatGPT/Codex OAuth; skipping automatic fallback",
+                            fallback
+                        ));
+                    } else {
+                        next_code_base::logging::info(&format!(
+                            "Model '{}' not available for account; falling back to '{}'",
+                            current, fallback
+                        ));
+                        {
+                            let mut w = self.model.write().await;
+                            *w = fallback.clone();
+                        }
+                        self.clear_persistent_ws(
+                            "automatic OpenAI model fallback changed the response chain",
+                        )
+                        .await;
+                        return fallback;
                     }
-                    self.clear_persistent_ws(
-                        "automatic OpenAI model fallback changed the response chain",
-                    )
-                    .await;
-                    return fallback;
                 }
             }
             next_code_base::provider::AccountModelAvailabilityState::Unknown => {
