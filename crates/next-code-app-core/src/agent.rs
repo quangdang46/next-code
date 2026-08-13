@@ -476,6 +476,9 @@ impl Agent {
         agent.session.provider_key =
             crate::session::derive_session_provider_key(agent.provider.name());
         agent.session.ensure_initial_session_context_message();
+        // Persist the freshly-created session before the first turn (R8): a
+        // kill -9 while idle must leave a restorable session, not a phantom.
+        agent.persist_session_best_effort("session creation");
 
         // Pre-approve tools from the always-allow config list.
         crate::dcg_bridge::init_session_allow_list(&agent.session.id);
@@ -776,7 +779,7 @@ impl Agent {
         (message, persist)
     }
 
-    fn persist_session_best_effort(&mut self, context: &str) {
+    pub(crate) fn persist_session_best_effort(&mut self, context: &str) {
         if let Err(err) = self.session.save() {
             logging::warn(&format!(
                 "Failed to persist {} for session {}: {}",
