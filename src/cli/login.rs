@@ -370,10 +370,25 @@ pub async fn run_login_provider(
     Ok(())
 }
 
-pub(crate) fn maybe_persist_default_provider_after_login(
+/// Persist the default provider after a login/connect flow (R6). Public so the
+/// Face connect path (`face_auth.rs`) can reuse the exact CLI-login mechanism
+/// instead of inventing its own.
+pub fn persist_default_provider_after_login_public(
+    provider: LoginProviderDescriptor,
+    options: LoginOptions,
+) {
+    maybe_persist_default_provider_after_login(provider, &options);
+}
+
+fn maybe_persist_default_provider_after_login(
     provider: LoginProviderDescriptor,
     options: &LoginOptions,
 ) {
+    // R5: an explicit API-key login must pin the API-key credential route so
+    // standalone runs use x-api-key instead of silently winning over to OAuth
+    // (which would bill the subscription account).
+    pin_api_key_credential_route_for_login(provider);
+
     let cfg = crate::config::Config::load();
     if cfg.provider.default_provider.is_some() {
         return;
@@ -408,6 +423,34 @@ pub(crate) fn maybe_persist_default_provider_after_login(
             provider_id, err
         ));
     }
+}
+
+/// R5: persist the runtime-provider credential-route pin after an explicit
+/// `login --provider anthropic-api` / `openai-api`. The provider startup
+/// (`maybe_enable_config_default_provider_for_auto`) applies the pin as
+/// `NEXT_CODE_RUNTIME_PROVIDER`, which the runtimes resolve into ApiKey vs
+/// OAuth — so a standalone run bills the API key, never the OAuth account.
+fn pin_api_key_credential_route_for_login(provider: LoginProviderDescriptor) {
+    let runtime_key = match provider.target {
+        LoginProviderTarget::ClaudeApiKey => Some("claude-api"),
+        LoginProviderTarget::OpenAiApiKey => Some("openai-api"),
+        _ => None,
+    };
+    let Some(runtime_key) = runtime_key else {
+        return;
+    };
+    if let Err(err) = crate::config::Config::set_runtime_provider_pin(Some(runtime_key)) {
+        crate::logging::warn(&format!(
+            "Failed to pin API-key credential route after {} login: {}",
+            provider.id, err
+        ));
+        return;
+    }
+    crate::logging::auth_event(
+        "login_pinned_api_key_route",
+        provider.id,
+        &[("runtime_provider", runtime_key)],
+    );
 }
 
 /// Best-effort: tell a running next-code server that on-disk auth has changed so it

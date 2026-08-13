@@ -225,7 +225,7 @@ pub async fn authenticate_method(method_id: &str) -> Result<()> {
             _ => {}
         }
 
-        return match provider.auth_kind {
+        let result = match provider.auth_kind {
             LoginProviderAuthKind::ApiKey
             | LoginProviderAuthKind::Local
             | LoginProviderAuthKind::Hybrid => run_api_key_face_login(provider).await,
@@ -239,6 +239,14 @@ pub async fn authenticate_method(method_id: &str) -> Result<()> {
                 );
             }
         };
+        result?;
+        // R6: persist the connected provider as the daemon's default so the
+        // next startup auto-selects it (same mechanism as CLI login).
+        super::login::persist_default_provider_after_login_public(
+            provider,
+            super::login::LoginOptions::default(),
+        );
+        return Ok(());
     }
 
     // models.dev long-tail / free-text custom id: store API key under provider id
@@ -349,9 +357,9 @@ async fn run_api_key_face_login(provider: LoginProviderDescriptor) -> Result<()>
     }
     // Persist the connected provider as the default so a daemon restart
     // auto-selects it (R6), mirroring the CLI login flow.
-    super::login::maybe_persist_default_provider_after_login(
+    super::login::persist_default_provider_after_login_public(
         provider,
-        &super::login::LoginOptions::default(),
+        super::login::LoginOptions::default(),
     );
     Ok(())
 }

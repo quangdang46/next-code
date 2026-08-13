@@ -594,6 +594,20 @@ impl AutoProviderAvailability {
 
 fn maybe_enable_config_default_provider_for_auto() -> Result<bool> {
     let cfg = crate::config::config();
+
+    // R5: apply the persisted API-key credential-route pin (set by
+    // `login --provider anthropic-api` / `openai-api`) before provider
+    // selection so standalone runs resolve to x-api-key, not OAuth.
+    if let Some(pin) = cfg
+        .provider
+        .runtime_provider_pin
+        .as_deref()
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+    {
+        crate::env::set_var("NEXT_CODE_RUNTIME_PROVIDER", pin);
+    }
+
     let Some(default_provider) = cfg
         .provider
         .default_provider

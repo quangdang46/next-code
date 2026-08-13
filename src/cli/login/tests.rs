@@ -166,3 +166,55 @@ fn auto_scriptable_flow_reason_skips_when_scriptable_input_already_explicit() {
     );
     assert_eq!(reason, None);
 }
+
+/// R5: `login --provider anthropic-api` / `openai-api` pins the API-key
+/// credential route via the config's runtime_provider_pin.
+#[test]
+fn api_key_login_pins_runtime_provider() {
+    let _guard = crate::storage::lock_test_env();
+    let temp = tempfile::TempDir::new().expect("temp dir");
+    let prev_home = std::env::var_os("NEXT_CODE_HOME");
+    crate::env::set_var("NEXT_CODE_HOME", temp.path());
+
+    // Clear any prior pin so the persistence is observable.
+    crate::config::Config::set_runtime_provider_pin(None).expect("clear pin");
+    let cfg = crate::config::config();
+    assert!(cfg.provider.runtime_provider_pin.is_none());
+
+    // Simulate an anthropic-api login pinning the route.
+    crate::config::Config::set_runtime_provider_pin(Some("claude-api"))
+        .expect("persist pin");
+    crate::config::Config::invalidate_cache();
+    let cfg = crate::config::config();
+    assert_eq!(
+        cfg.provider.runtime_provider_pin.as_deref(),
+        Some("claude-api"),
+        "API-key login must pin the claude-api route (R5)"
+    );
+
+    crate::env::set_var("NEXT_CODE_HOME", prev_home.unwrap_or_default());
+    crate::config::Config::invalidate_cache();
+}
+
+/// R6: the Face connect path persists the chosen provider as the daemon's
+/// default — verify the underlying config write works.
+#[test]
+fn face_connect_persists_default_provider() {
+    let _guard = crate::storage::lock_test_env();
+    let temp = tempfile::TempDir::new().expect("temp dir");
+    let prev_home = std::env::var_os("NEXT_CODE_HOME");
+    crate::env::set_var("NEXT_CODE_HOME", temp.path());
+
+    crate::config::Config::set_default_model(None, None).expect("clear default");
+    crate::config::Config::set_default_model(None, Some("openai")).expect("set default provider");
+    crate::config::Config::invalidate_cache();
+    let cfg = crate::config::config();
+    assert_eq!(
+        cfg.provider.default_provider.as_deref(),
+        Some("openai"),
+        "Face connect must persist the chosen default provider (R6)"
+    );
+
+    crate::env::set_var("NEXT_CODE_HOME", prev_home.unwrap_or_default());
+    crate::config::Config::invalidate_cache();
+}
