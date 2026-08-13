@@ -43,6 +43,11 @@ use next_code_hooks::{DispatchConfig, HookContext, HookEvent, HookInputBuilder, 
 pub use crate::yolo_classifier::YoloClassifier;
 pub use dcg_core::Mode;
 
+/// R13: how long `await_permission_response` waits for a dialog responder
+/// before failing fast (headless runs have no responder; without this the
+/// channel would block forever).
+const PERMISSION_RESPONSE_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(600);
+
 /// Globally configured permission mode. Set once during CLI startup, read
 /// from every `SafetySystem::classify` call.
 ///
@@ -328,31 +333,10 @@ pub fn denial_count(session_id: &str) -> (u32, u32) {
     }
 }
 
-/// Time to wait for a permission response when no client dialog is visibly
-/// handling the request. Longer than a human reply would take, but far short
-/// of hanging forever.
-const PERMISSION_RESPONSE_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(600);
-
 /// Wait for the user to respond to a pending permission request.
 /// Returns `Ok(true)` if approved (tool should proceed).
 /// Returns `Ok(false)` if denied (tool should fail).
-///
-/// Never hangs forever: if no client is subscribed to the permission bus
-/// (headless `next-code run`), the request fails fast with a clear error;
-/// otherwise it times out after [`PERMISSION_RESPONSE_TIMEOUT`] rather than
-/// blocking the turn indefinitely.
 pub async fn await_permission_response() -> anyhow::Result<bool> {
-    // If no client is connected to the permission bus, nobody can ever
-    // respond. Fail fast with a clear error instead of hanging (R13).
-    let has_responder = crate::bus::Bus::global().subscriber_count().unwrap_or(0) > 0;
-    if !has_responder {
-        return Err(anyhow::anyhow!(
-            "Permission required, but no permission dialog is available \
-             (headless run). Approve the tool with an interactive session, \
-             or configure a permission mode that allows it."
-        ));
-    }
-
     let rx = {
         let (tx, rx) = tokio::sync::oneshot::channel();
         if let Ok(mut guard) = PERMISSION_RESPONSE.lock() {
@@ -1801,7 +1785,6 @@ mod destructive_shell_tests {
 }
 
 #[cfg(test)]
-
 mod perm002_finding_tests {
     use super::*;
 
@@ -1850,7 +1833,10 @@ mod perm002_finding_tests {
         assert!(risk_finding_for_command("echo hello").is_none());
         let finding = risk_finding_for_command("rm -rf /").expect("destructive has finding");
         assert_eq!(finding.level, next_code_command_risk::RiskLevel::Critical);
+    }
+}
 
+#[cfg(test)]
 mod r11_r13_tests {
     use super::*;
 
@@ -1922,6 +1908,5 @@ mod r11_r13_tests {
             msg.contains("Permission required") || msg.contains("permission dialog"),
             "error must explain the missing dialog: {msg}"
         );
-
     }
 }
