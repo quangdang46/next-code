@@ -8,6 +8,34 @@ fn set_or_clear_env(key: &str, value: Option<std::ffi::OsString>) {
     }
 }
 
+/// R5: an API-key login must pin the API-key route via NEXT_CODE_RUNTIME_PROVIDER
+/// so a standalone `run` bills the key, not a stored OAuth credential.
+#[test]
+fn api_key_login_pins_api_key_route() {
+    // Anthropic API-key login pins `anthropic-api`.
+    crate::env::set_var("NEXT_CODE_RUNTIME_PROVIDER", "anthropic-api");
+    let route = next_code_provider_core::AuthRoute::parse("anthropic-api");
+    assert_eq!(
+        route.map(|r| (r.provider, r.mode)),
+        Some((
+            next_code_provider_core::DualAuthProvider::Anthropic,
+            next_code_provider_core::AuthMode::ApiKey
+        ))
+    );
+
+    // OpenAI API-key login pins `openai-api`.
+    crate::env::set_var("NEXT_CODE_RUNTIME_PROVIDER", "openai-api");
+    let route = next_code_provider_core::AuthRoute::parse("openai-api");
+    assert_eq!(
+        route.map(|r| (r.provider, r.mode)),
+        Some((
+            next_code_provider_core::DualAuthProvider::OpenAI,
+            next_code_provider_core::AuthMode::ApiKey
+        ))
+    );
+    crate::env::remove_var("NEXT_CODE_RUNTIME_PROVIDER");
+}
+
 #[test]
 fn scriptable_resume_command_matches_input_kind() {
     assert_eq!(

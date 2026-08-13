@@ -370,7 +370,7 @@ pub async fn run_login_provider(
     Ok(())
 }
 
-fn maybe_persist_default_provider_after_login(
+pub(crate) fn maybe_persist_default_provider_after_login(
     provider: LoginProviderDescriptor,
     options: &LoginOptions,
 ) {
@@ -434,7 +434,6 @@ async fn notify_running_server_auth_changed_best_effort(provider: Option<&str>) 
     }
 }
 
-
 fn login_openai_api_key_flow() -> Result<()> {
     eprintln!("Setting up OpenAI API key...");
     eprintln!("Get your API key from: https://platform.openai.com/api-keys\n");
@@ -457,6 +456,9 @@ fn login_openai_api_key_flow() -> Result<()> {
             .join("openai.env")
             .display()
     );
+    // Pin the API-key route so a standalone `run` bills the key instead of a
+    // stored ChatGPT OAuth credential (R5).
+    crate::env::set_var("NEXT_CODE_RUNTIME_PROVIDER", "openai-api");
     eprintln!("Provider: openai-api (native OpenAI Responses API)");
     Ok(())
 }
@@ -506,6 +508,10 @@ fn login_anthropic_api_key_flow() -> Result<()> {
     }
 
     save_named_api_key("anthropic.env", "ANTHROPIC_API_KEY", &key)?;
+    // Pin the API-key route so a standalone `run` bills the key instead of a
+    // stored Claude OAuth credential (R5). The provider reads this env at
+    // startup to resolve its credential mode.
+    crate::env::set_var("NEXT_CODE_RUNTIME_PROVIDER", "anthropic-api");
     eprintln!("\nSuccessfully saved Anthropic API key!");
     eprintln!(
         "Stored at {}",

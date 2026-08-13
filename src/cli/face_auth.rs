@@ -347,6 +347,12 @@ async fn run_api_key_face_login(provider: LoginProviderDescriptor) -> Result<()>
             path.display()
         ));
     }
+    // Persist the connected provider as the default so a daemon restart
+    // auto-selects it (R6), mirroring the CLI login flow.
+    super::login::maybe_persist_default_provider_after_login(
+        provider,
+        &super::login::LoginOptions::default(),
+    );
     Ok(())
 }
 
