@@ -130,6 +130,11 @@ pub(super) async fn cleanup_client_connection(
                             ));
                         }
                     }
+                    // Persist the Closed/Crashed state so a restart shows the
+                    // session as closed instead of Active (R7). Best-effort:
+                    // if the session journal is unwritable we still proceed
+                    // with cleanup.
+                    agent.persist_session_best_effort("disconnect cleanup");
 
                     let memory_enabled = agent.memory_enabled();
                     let transcript = if memory_enabled {

@@ -6,6 +6,7 @@ publish = false
 
 [dependencies]
 next-code-batch-types = { path = "../next-code-batch-types" }
+next-code-command-risk = { path = "../next-code-command-risk" }
 next-code-config-types = { path = "../next-code-config-types" }
 next-code-message-types = { path = "../next-code-message-types" }
 next-code-plan = { path = "../next-code-plan" }

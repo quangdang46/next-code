@@ -1,6 +1,6 @@
 #![cfg_attr(test, allow(clippy::await_holding_lock))]
 
-use crate::env::{product_env};
+use crate::env::product_env;
 pub mod best_of_n_orchestrator;
 mod compaction;
 mod environment;
@@ -32,7 +32,8 @@ use crate::compaction::CompactionEvent;
 use crate::id;
 use crate::logging;
 use crate::message::{
-    ContentBlock, Message, Role, StreamEvent, TOOL_OUTPUT_MISSING_TEXT, ToolCall, ToolDefinition,
+    ContentBlock, Message, Role, StreamEvent, TOOL_OUTPUT_INTERRUPTED_TEXT,
+    TOOL_OUTPUT_MISSING_TEXT, ToolCall, ToolDefinition,
 };
 use crate::protocol::{HistoryMessage, ServerEvent};
 use crate::provider::{NativeToolResult, Provider, ProviderRuntimeState};
@@ -63,16 +64,17 @@ pub use next_code_agent_runtime::{
 const NEXT_CODE_NATIVE_TOOLS: &[&str] = &["selfdev", "communicate"];
 static RECOVERED_TEXT_WRAPPED_TOOL_CALLS: std::sync::atomic::AtomicU64 =
     std::sync::atomic::AtomicU64::new(0);
-static NEXT_CODE_REPO_SOURCE_STATE: LazyLock<(Option<String>, Option<bool>)> = LazyLock::new(|| {
-    crate::build::get_repo_dir()
-        .map(|repo_dir| {
-            (
-                build::current_git_hash(&repo_dir).ok(),
-                build::is_working_tree_dirty(&repo_dir).ok(),
-            )
-        })
-        .unwrap_or((None, None))
-});
+static NEXT_CODE_REPO_SOURCE_STATE: LazyLock<(Option<String>, Option<bool>)> =
+    LazyLock::new(|| {
+        crate::build::get_repo_dir()
+            .map(|repo_dir| {
+                (
+                    build::current_git_hash(&repo_dir).ok(),
+                    build::is_working_tree_dirty(&repo_dir).ok(),
+                )
+            })
+            .unwrap_or((None, None))
+    });
 static WORKING_GIT_STATE_CACHE: LazyLock<StdMutex<HashMap<PathBuf, Option<GitState>>>> =
     LazyLock::new(|| StdMutex::new(HashMap::new()));
 #[cfg(feature = "dcp")]
@@ -474,6 +476,9 @@ impl Agent {
         agent.session.provider_key =
             crate::session::derive_session_provider_key(agent.provider.name());
         agent.session.ensure_initial_session_context_message();
+        // Persist the freshly-created session before the first turn (R8): a
+        // kill -9 while idle must leave a restorable session, not a phantom.
+        agent.persist_session_best_effort("session creation");
 
         // Pre-approve tools from the always-allow config list.
         crate::dcg_bridge::init_session_allow_list(&agent.session.id);
@@ -761,9 +766,8 @@ impl Agent {
         memory: &crate::memory::PendingMemory,
     ) -> (Message, bool) {
         let message = Self::memory_injection_message(memory);
-        let persist = crate::config::config().experiment_enabled(
-            next_code_experiment_flags::ExperimentFlag::PersistMemoryInjection,
-        );
+        let persist = crate::config::config()
+            .experiment_enabled(next_code_experiment_flags::ExperimentFlag::PersistMemoryInjection);
         if persist {
             self.add_message_with_display_role(
                 Role::User,
@@ -775,7 +779,7 @@ impl Agent {
         (message, persist)
     }
 
-    fn persist_session_best_effort(&mut self, context: &str) {
+    pub(crate) fn persist_session_best_effort(&mut self, context: &str) {
         if let Err(err) = self.session.save() {
             logging::warn(&format!(
                 "Failed to persist {} for session {}: {}",
@@ -1071,14 +1075,26 @@ impl Agent {
 
         self.tool_output_scan_index = self.session.messages.len();
 
+        // An orphan ToolUse at this point usually means the turn was interrupted
+        // (cancel / reload) before its tool results could be recorded. Mark the
+        // synthetic result as a non-error interruption notice so the model does
+        // not treat the cancelled tool as a failed one.
+        let interrupted = self.graceful_shutdown.is_set();
+
         let mut repaired = 0usize;
         let mut inserted = 0usize;
         for (index, missing_for_message) in missing_repairs {
             for (offset, id) in missing_for_message.iter().enumerate() {
                 let tool_block = ContentBlock::ToolResult {
                     tool_use_id: id.clone(),
-                    content: TOOL_OUTPUT_MISSING_TEXT.to_string(),
-                    is_error: Some(true),
+                    content: if interrupted {
+                        TOOL_OUTPUT_INTERRUPTED_TEXT.to_string()
+                    } else {
+                        TOOL_OUTPUT_MISSING_TEXT.to_string()
+                    },
+                    // Interrupted turns are NOT errors — the tool was cancelled,
+                    // not failed. Only genuine missing outputs are errors.
+                    is_error: Some(!interrupted),
                 };
                 let stored_message = StoredMessage {
                     id: id::new_id("message"),

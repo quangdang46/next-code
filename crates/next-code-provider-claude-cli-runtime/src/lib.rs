@@ -4,10 +4,10 @@
 //! binary's composition root registers [`ClaudeProvider`] with
 //! `next_code_base::provider::external` at startup.
 
-use next_code_core::env::{product_env};
 use anyhow::{Context, Result};
 use async_trait::async_trait;
 use next_code_base::auth::{claude as claude_auth, oauth};
+use next_code_core::env::product_env;
 use next_code_message_types::{ContentBlock, Message, Role, StreamEvent, ToolDefinition};
 use next_code_provider_core::NativeToolResultSender;
 use next_code_provider_core::{EventStream, Provider};
@@ -863,6 +863,10 @@ impl Provider for ClaudeProvider {
 
     fn handles_tools_internally(&self) -> bool {
         true
+    }
+
+    fn native_tool_names(&self) -> &'static [&'static str] {
+        NATIVE_TOOL_NAMES
     }
 
     fn name(&self) -> &'static str {

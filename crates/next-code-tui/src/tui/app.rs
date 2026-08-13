@@ -1,4 +1,3 @@
-use crate::env::{product_env};
 use super::DisplayMessageRoleExt;
 use super::keybind::{
     CenteredToggleKeys, ModelSwitchKeys, OptionalBinding, ScrollKeys, WorkspaceNavigationKeys,
@@ -8,6 +7,7 @@ use super::stream_buffer::StreamBuffer;
 use crate::bus::{Bus, BusEvent, LoginCompleted, ToolEvent, ToolStatus};
 use crate::compaction::CompactionEvent;
 use crate::config::config;
+use crate::env::product_env;
 use crate::id;
 use crate::mcp::McpManager;
 use crate::message::{
@@ -1397,6 +1397,9 @@ pub struct App {
     pub pending_permission_selected: usize,
     /// Tool input for the pending permission dialog (to show command, diff, etc).
     pub pending_permission_input: Option<serde_json::Value>,
+    /// Command-risk justification for the pending permission (NX-PERM-002),
+    /// shown as a color-coded badge + justification line on the dialog.
+    pub pending_permission_finding: Option<next_code_command_risk::RiskFinding>,
     /// Status line display configuration for this session.
     pub status_line_config: next_code_config_types::StatusLineConfig,
     /// Running tools/subagents/background interactive list (Claude Code style).

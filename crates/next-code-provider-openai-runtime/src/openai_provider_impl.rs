@@ -672,6 +672,20 @@ impl Provider for OpenAIProvider {
     }
 
     fn set_model(&self, model: &str) -> Result<()> {
+        // GPT Pro models are API-key-only. The ChatGPT/Codex OAuth backend
+        // rejects them ("not supported when using Codex with a ChatGPT
+        // account"), so an OAuth-shaped credential must never accept them no
+        // matter what the picker/catalog surfaces. The platform API-key route
+        // (non-ChatGPT credential shape) still accepts them below.
+        if next_code_provider_core::is_openai_api_only_pro_model(model)
+            && let Ok(credentials) = self.credentials.try_read()
+            && Self::is_chatgpt_mode(&credentials)
+        {
+            anyhow::bail!(
+                "The '{}' model requires an OpenAI platform API key (rejected by ChatGPT/Codex login). Use /login openai-api or pick a non-Pro model.",
+                model,
+            );
+        }
         if !next_code_base::provider::known_openai_model_ids()
             .iter()
             .any(|known| known == model)

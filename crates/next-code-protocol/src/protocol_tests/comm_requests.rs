@@ -118,6 +118,7 @@ fn test_permission_request_event_roundtrip() -> Result<()> {
         alternatives: vec!["use read instead".to_string()],
         tool_input: Some(serde_json::json!({"command": "rm -rf /"})),
         tool_call_id: "call_1".to_string(),
+        finding: None,
     };
     let json = encode_event(&event);
     assert!(json.contains("\"type\":\"permission_request\""));

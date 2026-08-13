@@ -591,8 +591,8 @@ Copy-Item -Path $DestBin -Destination (Join-Path $StableDir "next-code.exe") -Fo
 Set-Content -Path (Join-Path $BuildsDir "stable-version") -Value $VersionNum
 Copy-Item -Path (Join-Path $StableDir "next-code.exe") -Destination $LauncherPath -Force
 
-# Compat copy for one release so existing `next-code` muscle memory keeps working.
-$CompatLauncherPath = Join-Path $InstallDir "next-code.exe"
+# Compat copy for one release so existing `nextcode` muscle memory keeps working.
+$CompatLauncherPath = Join-Path $InstallDir "nextcode.exe"
 Copy-Item -Path (Join-Path $StableDir "next-code.exe") -Destination $CompatLauncherPath -Force
 
 # Gracefully reload any running background server onto the freshly installed

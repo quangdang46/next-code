@@ -974,6 +974,7 @@ pub(super) async fn handle_client(
                                 alternatives: req.alternatives,
                                 tool_input: req.tool_input,
                                 tool_call_id: String::new(),
+                                finding: req.finding,
                             });
                         }
                     }
