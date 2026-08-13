@@ -30,7 +30,7 @@ use crate::notifications::{NotificationEvent, NotificationEventKind};
 use crate::scrollback::block::RenderBlock;
 use crate::scrollback::blocks::SessionEvent;
 use crate::views::permission_view::{
-    McpScope, McpScopeState, PermissionFocus, PermissionViewState, SubagentInfo,
+    McpScope, McpScopeState, PermissionFocus, PermissionViewState, RiskFindingDebug, SubagentInfo,
 };
 use crate::views::plan_approval_view::PlanReviewSource;
 

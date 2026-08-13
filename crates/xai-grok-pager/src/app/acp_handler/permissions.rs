@@ -128,6 +128,15 @@ fn enqueue_permission(
             selected: McpScope::Tool,
         });
 
+    // 1c. NX-PERM-001: parse the command-risk finding from request meta so the
+    //     permission card can render the "Why?" / risk line.
+    let risk_finding = perm
+        .request
+        .meta
+        .as_ref()
+        .and_then(|meta| meta.get("risk_finding"))
+        .and_then(|v| serde_json::from_value::<RiskFindingDebug>(v.clone()).ok());
+
     // 2. Build subagent provenance label.
     //    If session_id differs from the root session, look up subagent info.
     let subagent_label = resolve_subagent_label(agent, &perm.request.session_id);
@@ -167,6 +176,7 @@ fn enqueue_permission(
         bash_selection_count,
         bash_command_raw,
         mcp_scope,
+        risk_finding,
         title,
         description,
         args_expanded: false,
