@@ -9,9 +9,7 @@ use agent_client_protocol as acp;
 use anyhow::{Context, Result, anyhow, bail};
 use async_trait::async_trait;
 use futures::Stream;
-use next_code_message_types::{
-    ContentBlock, Message, Role, StreamEvent, ToolDefinition,
-};
+use next_code_message_types::{ContentBlock, Message, Role, StreamEvent, ToolDefinition};
 use next_code_provider_core::{EventStream, ModelRoute, Provider};
 use serde_json::{Map, Value};
 use std::collections::BTreeMap;
@@ -394,8 +392,9 @@ fn select_subscription_auth_method(
 async fn initialize_and_authenticate(
     connection: &acp::ClientSideConnection,
 ) -> Result<acp::InitializeResponse> {
-    let initialize = acp::InitializeRequest::new(acp::ProtocolVersion::V1)
-        .client_info(acp::Implementation::new("next-code", env!("CARGO_PKG_VERSION")).title("Next-code"));
+    let initialize = acp::InitializeRequest::new(acp::ProtocolVersion::V1).client_info(
+        acp::Implementation::new("next-code", env!("CARGO_PKG_VERSION")).title("Next-code"),
+    );
     let response = timeout_request("initialize", connection.initialize(initialize)).await?;
     if response.protocol_version != acp::ProtocolVersion::V1 {
         bail!(
@@ -655,32 +654,77 @@ impl acp::Client for GrokAcpClient {
         &self,
         notification: acp::SessionNotification,
     ) -> acp::Result<()> {
-        let event = match notification.update {
-            acp::SessionUpdate::AgentMessageChunk(chunk) => {
-                text_from_acp_content(chunk.content).map(StreamEvent::TextDelta)
-            }
-            acp::SessionUpdate::AgentThoughtChunk(chunk) => {
-                text_from_acp_content(chunk.content).map(StreamEvent::ThinkingDelta)
-            }
-            acp::SessionUpdate::ToolCall(call) => {
-                Some(StreamEvent::StatusDetail { detail: call.title })
-            }
-            acp::SessionUpdate::ToolCallUpdate(update) => update
-                .fields
-                .title
-                .map(|detail| StreamEvent::StatusDetail { detail }),
-            _ => None,
-        };
-        if let Some(event) = event {
+        if let Some(event) = event_from_session_update(&notification.update) {
             let _ = self.tx.send(Ok(event)).await;
         }
         Ok(())
     }
 }
 
+/// Convert an ACP session update into a next-code stream event.
+///
+/// A completed ACP tool call (`ToolCallUpdate` with status `Completed`) must
+/// produce a `ToolResult` so the turn loop can persist it. Without this, a Grok
+/// Build agent calling a non-native tool leaves an orphan ToolUse in the
+/// transcript and the next turn fabricates a failure (R2/R4).
+fn event_from_session_update(update: &acp::SessionUpdate) -> Option<StreamEvent> {
+    match update {
+        acp::SessionUpdate::AgentMessageChunk(chunk) => {
+            text_from_acp_content_ref(&chunk.content).map(StreamEvent::TextDelta)
+        }
+        acp::SessionUpdate::AgentThoughtChunk(chunk) => {
+            text_from_acp_content_ref(&chunk.content).map(StreamEvent::ThinkingDelta)
+        }
+        acp::SessionUpdate::ToolCall(call) => Some(StreamEvent::StatusDetail {
+            detail: call.title.clone(),
+        }),
+        acp::SessionUpdate::ToolCallUpdate(update) => {
+            // The Grok CLI reports completion via ToolCallUpdate with status ==
+            // Completed; the final content holds the result.
+            if update.fields.status == Some(acp::ToolCallStatus::Completed) {
+                let content = update
+                    .fields
+                    .content
+                    .as_ref()
+                    .and_then(|blocks| blocks.last())
+                    .and_then(tool_call_content_text)
+                    .unwrap_or_default();
+                Some(StreamEvent::ToolResult {
+                    tool_use_id: update.tool_call_id.0.to_string(),
+                    content,
+                    is_error: false,
+                })
+            } else {
+                update
+                    .fields
+                    .title
+                    .clone()
+                    .map(|detail| StreamEvent::StatusDetail { detail })
+            }
+        }
+        _ => None,
+    }
+}
+
 fn text_from_acp_content(content: acp::ContentBlock) -> Option<String> {
+    text_from_acp_content_ref(&content)
+}
+
+fn text_from_acp_content_ref(content: &acp::ContentBlock) -> Option<String> {
     match content {
-        acp::ContentBlock::Text(text) => Some(text.text),
+        acp::ContentBlock::Text(text) => Some(text.text.clone()),
+        _ => None,
+    }
+}
+
+/// Extract the text from an ACP tool-call content block reference (used for
+/// tool-result content, which the Grok CLI sends as text content blocks).
+fn tool_call_content_text(block: &acp::ToolCallContent) -> Option<String> {
+    match block {
+        acp::ToolCallContent::Content(content) => match &content.content {
+            acp::ContentBlock::Text(text) => Some(text.text.clone()),
+            _ => None,
+        },
         _ => None,
     }
 }
@@ -745,6 +789,52 @@ fn cached_login_hint(prefix: &str) -> String {
 mod tests {
     use super::*;
     use serde_json::json;
+    use std::sync::Arc;
+
+    /// R4: a completed ACP tool call must produce a ToolResult (tool_use_id,
+    /// content, is_error=false) so the turn loop can persist it — not a
+    /// StatusDetail, and never a silent drop.
+    #[test]
+    fn completed_tool_call_update_emits_tool_result() {
+        let update = acp::SessionUpdate::ToolCallUpdate(acp::ToolCallUpdate::new(
+            acp::ToolCallId::new(Arc::from("call_read_1")),
+            acp::ToolCallUpdateFields::new()
+                .title("Read file")
+                .status(Some(acp::ToolCallStatus::Completed))
+                .content(vec![acp::ToolCallContent::Content(acp::Content::new(
+                    acp::ContentBlock::Text(acp::TextContent::new("file contents")),
+                ))]),
+        ));
+
+        match event_from_session_update(&update) {
+            Some(StreamEvent::ToolResult {
+                tool_use_id,
+                content,
+                is_error,
+            }) => {
+                assert_eq!(tool_use_id, "call_read_1");
+                assert_eq!(content, "file contents");
+                assert!(!is_error);
+            }
+            other => panic!("expected ToolResult, got: {other:?}"),
+        }
+    }
+
+    /// R4: an in-progress tool call update stays a StatusDetail (not a result).
+    #[test]
+    fn in_progress_tool_call_update_emits_status_detail() {
+        let update = acp::SessionUpdate::ToolCallUpdate(acp::ToolCallUpdate::new(
+            acp::ToolCallId::new(Arc::from("call_1")),
+            acp::ToolCallUpdateFields::new()
+                .title("Running")
+                .status(Some(acp::ToolCallStatus::InProgress)),
+        ));
+
+        match event_from_session_update(&update) {
+            Some(StreamEvent::StatusDetail { detail }) => assert_eq!(detail, "Running"),
+            other => panic!("expected StatusDetail, got: {other:?}"),
+        }
+    }
 
     #[test]
     fn chooses_cached_subscription_auth_and_rejects_api_key_only() {
