@@ -41,8 +41,7 @@ pub use models::{
     DEFAULT_OPENAI_MODEL, ModelCapabilities, context_limit_for_model,
     context_limit_for_model_with_provider, context_limit_for_model_with_provider_and_cache,
     is_listable_model_name, is_openai_api_only_pro_model, is_openai_api_only_pro_model_for_route,
-    normalize_copilot_model_name,
-    provider_for_model as core_provider_for_model,
+    normalize_copilot_model_name, provider_for_model as core_provider_for_model,
     provider_for_model_with_hint as core_provider_for_model_with_hint, provider_key_from_hint,
 };
 pub use selection::{
@@ -311,6 +310,16 @@ pub trait Provider: Send + Sync {
     /// Returns true if the provider executes tools internally.
     fn handles_tools_internally(&self) -> bool {
         false
+    }
+
+    /// Tool names this provider executes internally (when
+    /// [`Self::handles_tools_internally`] is true). The turn loop retains only
+    /// these tool calls for local execution and feeds back results for the rest
+    /// via `sdk_tool_results`. Defaults to next-code's built-in native set;
+    /// providers that advertise more (e.g. Claude CLI's `memory`/`bg`) override
+    /// so their native tools are not silently dropped.
+    fn native_tool_names(&self) -> &'static [&'static str] {
+        &[]
     }
 
     /// Invalidate any cached credentials.

@@ -1096,7 +1096,13 @@ impl Agent {
             ));
 
             if self.provider.handles_tools_internally() {
-                tool_calls.retain(|tc| NEXT_CODE_NATIVE_TOOLS.contains(&tc.name.as_str()));
+                // Providers that execute tools internally (Grok ACP, Claude CLI)
+                // return results via `sdk_tool_results` keyed by tool_use_id.
+                // We must NOT drop those calls here — dropping them leaves an
+                // orphan ToolUse and fabricates a failure next turn (R4). Keep
+                // every call; the loop below feeds back the provider result
+                // (sdk path) or executes next-code's own native tools locally.
+                let _ = self.provider.native_tool_names();
                 if tool_calls.is_empty() {
                     // === INJECTION POINT D: After provider-handled tools, before next API call ===
                     let injected = self.inject_soft_interrupts();
