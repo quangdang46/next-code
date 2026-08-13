@@ -277,6 +277,16 @@ impl McpConfig {
         Ok(())
     }
 
+    /// Run the first-run MCP config import (Claude Code / Codex CLI) explicitly.
+    ///
+    /// This is the ONLY entry point that performs the migration. It is invoked
+    /// at manager construction / setup, NOT from the config read path — a read
+    /// (`load_catalog_for_dir` / `load_for_dir`) must never write config, which
+    /// previously raced double-writes and surfaced in `doctor --only mcp`.
+    pub fn run_first_run_import() {
+        Self::import_from_external();
+    }
+
     /// Import MCP servers from Claude Code and Codex CLI on first run.
     /// Only runs if ~/.next-code/mcp.json doesn't exist yet.
     #[expect(
@@ -519,8 +529,6 @@ impl McpConfig {
         reason = "Import logic keeps source-specific MCP config merge order explicit"
     )]
     pub fn load_catalog_for_dir(project_dir: Option<&std::path::Path>) -> Self {
-        Self::import_from_external();
-
         let mut merged = Self::default();
 
         if let Ok(next_code_dir) = crate::storage::next_code_dir() {

@@ -1905,6 +1905,36 @@ impl Provider for MultiProvider {
             return self.set_model_on_provider(forced, requested_model);
         }
 
+        // An active OpenAI-compatible profile (e.g. opencode-go) means a bare
+        // model picked from the Face /model picker is a profile-local model id,
+        // not a global Claude/OpenAI/OpenRouter id. Routing it through the
+        // global heuristic below would resolve it to `None` and fall through to
+        // `set_model_on_provider(self.active_provider(), ...)` — which is
+        // OpenRouter whenever a compatible profile is active (selection.rs:17) —
+        // clearing the active profile and rebinding to the real OpenRouter
+        // runtime. Route it to the active profile instead, as long as it isn't
+        // a known built-in id the user explicitly wants.
+        if provider_for_model(requested_model).is_none()
+            && let Some(profile_id) = self
+                .active_openai_compatible_profile
+                .read()
+                .unwrap_or_else(|poisoned| poisoned.into_inner())
+                .clone()
+            && let Some(profile) =
+                crate::provider_catalog::openai_compatible_profile_by_id(&profile_id)
+        {
+            return self.set_model_on_openai_compatible_profile(profile, requested_model);
+        }
+
+        // GitHub Copilot models use Claude-looking dotted names (e.g.
+        // "claude-sonnet-4.6"). When Copilot is the active provider, a bare
+        // model must stay on Copilot instead of being re-normalized and routed
+        // to Anthropic by the global heuristic below. This mirrors the
+        // forced_provider lock above for the (non-locked) active-Copilot case.
+        if self.active_provider() == ActiveProvider::Copilot {
+            return self.set_model_on_provider(ActiveProvider::Copilot, requested_model);
+        }
+
         // Normalize Copilot-style model names (dots -> hyphens) to canonical form.
         // e.g. "claude-opus-4.6" -> "claude-opus-4-6" so Anthropic accepts it.
         let model = if let Some(canonical) = normalize_copilot_model_name(requested_model) {

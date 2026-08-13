@@ -61,6 +61,9 @@ pub struct McpManager {
 impl McpManager {
     /// Create a new manager in owned in-process mode (used by tests and local harnesses).
     pub fn new() -> Self {
+        // First-run import runs once at manager construction (explicit
+        // migration), not on every config read.
+        McpConfig::run_first_run_import();
         Self {
             pool: None,
             pool_handles: RwLock::new(HashMap::new()),
@@ -84,6 +87,9 @@ impl McpManager {
         session_id: String,
         project_dir: Option<std::path::PathBuf>,
     ) -> Self {
+        // First-run import runs once at manager construction (explicit
+        // migration), not on every config read.
+        McpConfig::run_first_run_import();
         Self {
             pool: Some(pool),
             pool_handles: RwLock::new(HashMap::new()),
