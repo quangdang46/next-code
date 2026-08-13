@@ -388,6 +388,21 @@ pub(crate) async fn run_main(mut args: Args) -> Result<()> {
                     );
                 }
             }
+            PermissionCommand::Explain { command } => {
+                // NX-PERM-002: print the command-risk finding (RiskLevel +
+                // justification) for a shell command without executing it.
+                let ctx = next_code_command_risk::RiskContext::from_env(None);
+                let assessment = next_code_command_risk::assess(&command, &ctx);
+                println!("Command: {}", command);
+                println!("Risk level: {:?}", assessment.level);
+                if assessment.findings.is_empty() {
+                    println!("Justification: no risk finding (safe)");
+                } else {
+                    for finding in &assessment.findings {
+                        println!("Justification: {}", finding.description());
+                    }
+                }
+            }
         },
         Some(Command::Ambient(subcmd)) => {
             commands::run_ambient_command(map_ambient_subcommand(subcmd)).await?;
