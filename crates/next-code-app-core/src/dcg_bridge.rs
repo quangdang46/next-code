@@ -328,10 +328,31 @@ pub fn denial_count(session_id: &str) -> (u32, u32) {
     }
 }
 
+/// Time to wait for a permission response when no client dialog is visibly
+/// handling the request. Longer than a human reply would take, but far short
+/// of hanging forever.
+const PERMISSION_RESPONSE_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(600);
+
 /// Wait for the user to respond to a pending permission request.
 /// Returns `Ok(true)` if approved (tool should proceed).
 /// Returns `Ok(false)` if denied (tool should fail).
+///
+/// Never hangs forever: if no client is subscribed to the permission bus
+/// (headless `next-code run`), the request fails fast with a clear error;
+/// otherwise it times out after [`PERMISSION_RESPONSE_TIMEOUT`] rather than
+/// blocking the turn indefinitely.
 pub async fn await_permission_response() -> anyhow::Result<bool> {
+    // If no client is connected to the permission bus, nobody can ever
+    // respond. Fail fast with a clear error instead of hanging (R13).
+    let has_responder = crate::bus::Bus::global().subscriber_count().unwrap_or(0) > 0;
+    if !has_responder {
+        return Err(anyhow::anyhow!(
+            "Permission required, but no permission dialog is available \
+             (headless run). Approve the tool with an interactive session, \
+             or configure a permission mode that allows it."
+        ));
+    }
+
     let rx = {
         let (tx, rx) = tokio::sync::oneshot::channel();
         if let Ok(mut guard) = PERMISSION_RESPONSE.lock() {
@@ -339,10 +360,14 @@ pub async fn await_permission_response() -> anyhow::Result<bool> {
         }
         rx
     };
-    match rx.await {
-        Ok(true) => Ok(true),
-        Ok(false) => Ok(false),
-        Err(_) => Err(anyhow::anyhow!("Permission request cancelled")),
+    match tokio::time::timeout(PERMISSION_RESPONSE_TIMEOUT, rx).await {
+        Ok(Ok(true)) => Ok(true),
+        Ok(Ok(false)) => Ok(false),
+        Ok(Err(_)) => Err(anyhow::anyhow!("Permission request cancelled")),
+        Err(_) => Err(anyhow::anyhow!(
+            "Permission request timed out after {}s without a response",
+            PERMISSION_RESPONSE_TIMEOUT.as_secs()
+        )),
     }
 }
 
@@ -1776,6 +1801,7 @@ mod destructive_shell_tests {
 }
 
 #[cfg(test)]
+
 mod perm002_finding_tests {
     use super::*;
 
@@ -1824,5 +1850,78 @@ mod perm002_finding_tests {
         assert!(risk_finding_for_command("echo hello").is_none());
         let finding = risk_finding_for_command("rm -rf /").expect("destructive has finding");
         assert_eq!(finding.level, next_code_command_risk::RiskLevel::Critical);
+
+mod r11_r13_tests {
+    use super::*;
+
+    /// R11: `init_session_allow_list` must re-approve every `always_allow_tools`
+    /// entry for a session. `restore_session_with_working_dir` calls this after
+    /// clearing the previous session's tool policy, so always-allow survives a
+    /// resume.
+    #[test]
+    fn init_session_allow_list_approves_config_always_allow_tools() {
+        let sid = "sess-init-allow-list-r11";
+        clear_session_mode(sid);
+        // Start from a clean allow-list state.
+        clear_session_allowed_action(sid, "read");
+        clear_session_allowed_action(sid, "bash");
+
+        // `add_always_allow_tool` writes through the real config file in the
+        // test env (locked by lock_test_env), exercising the same source
+        // `init_session_allow_list` reads.
+        crate::config::Config::add_always_allow_tool("read")
+            .expect("add always-allow tool for test");
+        let config = crate::config::config();
+        assert!(
+            config.always_allow_tools.iter().any(|t| t == "read"),
+            "test config must contain the always-allow tool"
+        );
+
+        init_session_allow_list(sid);
+        let decision = classify_for_session("read", sid);
+        assert!(
+            matches!(decision, BridgeDecision::Allow),
+            "always-allow tool must be allowed after init_session_allow_list: {decision:?}"
+        );
+        // A tool that is NOT in always_allow_tools must not be pre-approved by
+        // the seed (it may still classify Allow via mode, but not via the
+        // session allow-list).
+        assert!(
+            !session_allows_action(sid, "bash"),
+            "bash must not be session-approved by init_session_allow_list"
+        );
+
+        clear_session_mode(sid);
+        clear_session_allowed_action(sid, "read");
+        clear_session_allowed_action(sid, "bash");
+    }
+
+    /// R13: `await_permission_response` must fail fast with a clear error when
+    /// there is no bus subscriber (headless `next-code run`) instead of hanging
+    /// forever. Tests run without any bus subscriber, so the no-responder error
+    /// path is exercised.
+    #[tokio::test]
+    async fn await_permission_response_fails_fast_without_responder() {
+        // This test process subscribes to nothing; if other tests leaked a
+        // subscriber we can't be sure, but with an empty bus the error path is
+        // deterministic.
+        let has_responder = crate::bus::Bus::global()
+            .subscriber_count()
+            .map(|count| count > 0)
+            .unwrap_or(true);
+        if has_responder {
+            // A subscriber exists (e.g. another test's bus subscription);
+            // timeout would take 600s so skip rather than hang the suite.
+            return;
+        }
+
+        let result = await_permission_response().await;
+        let err = result.expect_err("headless permission wait must error, not hang");
+        let msg = err.to_string();
+        assert!(
+            msg.contains("Permission required") || msg.contains("permission dialog"),
+            "error must explain the missing dialog: {msg}"
+        );
+
     }
 }

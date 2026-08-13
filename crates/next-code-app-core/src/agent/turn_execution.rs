@@ -1091,6 +1091,10 @@ impl Agent {
             self.allowed_tools.clone(),
             self.disabled_tools.clone(),
         );
+        // Re-seed the session allow-list from `always_allow_tools` so tools the
+        // user previously marked as always-allow stay approved across a resume
+        // (create_agent seeds it; restore must too, R11).
+        crate::dcg_bridge::init_session_allow_list(&self.session.id);
         let assign_ms = assign_start.elapsed().as_millis();
 
         let reset_start = Instant::now();

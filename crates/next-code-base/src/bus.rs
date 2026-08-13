@@ -545,6 +545,13 @@ impl Bus {
         self.sender.subscribe()
     }
 
+    /// Number of active bus subscribers, if the broadcast channel can report it.
+    /// Used to detect headless runs (no client dialog consumer) so permission
+    /// waits can fail fast instead of hanging (R13).
+    pub fn subscriber_count(&self) -> Option<usize> {
+        Some(self.sender.receiver_count())
+    }
+
     pub fn publish(&self, event: BusEvent) {
         if let BusEvent::UpdateStatus(status) = &event {
             let mut latest = latest_update_status()
