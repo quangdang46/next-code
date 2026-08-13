@@ -20,6 +20,8 @@ use ratatui::buffer::Buffer;
 use ratatui::layout::Rect;
 use ratatui::style::{Modifier, Style};
 use ratatui::text::{Line, Span};
+
+use super::info_floats::rgb;
 use xai_grok_workspace::permission::bash_command_splitting::{
     BashCommandHighlights, heredoc_payload_byte_ranges, range_fully_inside,
     soft_break_offsets_after_operators, split_physical_line_at_soft_breaks,
@@ -105,6 +107,16 @@ impl McpScopeState {
 ///
 /// Not `Clone` because it owns the `response_tx` oneshot sender via
 /// `xai_acp_lib::AcpArgs`.
+/// NX-PERM-001: a command-risk finding attached to a permission request,
+/// deserialized from the `risk_finding` request-meta key. Rendered as the
+/// "Why?" / risk line on the permission card.
+#[derive(Debug, Clone, serde::Deserialize)]
+pub struct RiskFindingDebug {
+    pub level: String,
+    pub justification: String,
+    pub description: String,
+}
+
 pub struct PermissionViewState {
     /// The ACP permission request args (holds `response_tx` for sending
     /// the response back to the shell).
@@ -130,6 +142,11 @@ pub struct PermissionViewState {
     /// Parsed bash highlights from request meta (None for non-bash
     /// permissions). Imported from `xai-grok-shell`, NOT duplicated locally.
     pub bash_highlights: Option<BashCommandHighlights>,
+
+    /// NX-PERM-001: command-risk finding (level + justification) attached to the
+    /// permission request meta, if any. Rendered as the "Why?" / risk line so
+    /// every allow/deny is explainable.
+    pub risk_finding: Option<RiskFindingDebug>,
 
     /// How many highlighted words are currently selected (1-indexed).
     /// Starts at `default_always_allow_scope(highlighted_words)`: the safe
@@ -468,6 +485,39 @@ pub fn render_permission_view(
                 content_x,
                 y,
                 &Line::from(Span::styled(label.clone(), prov_style)),
+                content_width,
+            );
+        }
+        y += 1;
+    }
+
+    // NX-PERM-001: command-risk "Why?" line (if a finding is attached). Shows
+    // the risk level + justification so every allow/deny is explainable.
+    if let Some(ref finding) = state.risk_finding {
+        if y < area_bottom {
+            let risk_color = match finding.level.as_str() {
+                "Safe" | "Low" => rgb(100, 180, 100),
+                "Medium" => rgb(235, 190, 105),
+                "High" => rgb(235, 160, 80),
+                _ => rgb(255, 100, 100),
+            };
+            buf.set_line(
+                content_x,
+                y,
+                &Line::from(vec![
+                    Span::styled(
+                        format!(" Risk: {} ", finding.level),
+                        Style::default()
+                            .fg(rgb(0, 0, 0))
+                            .bg(risk_color)
+                            .add_modifier(Modifier::BOLD),
+                    ),
+                    Span::raw(" "),
+                    Span::styled(
+                        finding.justification.clone(),
+                        Style::default().fg(theme.gray),
+                    ),
+                ]),
                 content_width,
             );
         }
@@ -1886,6 +1936,7 @@ mod tests {
             bash_selection_count: 0,
             bash_command_raw: Some("cargo test --all".to_string()),
             mcp_scope: None,
+            risk_finding: None,
             title: title.to_string(),
             description: vec![],
             args_expanded: false,
@@ -2039,6 +2090,7 @@ mod tests {
             bash_selection_count: 0,
             bash_command_raw: None,
             mcp_scope,
+            risk_finding: None,
             title: String::new(),
             description: vec![],
             args_expanded: false,

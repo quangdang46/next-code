@@ -483,6 +483,9 @@ pub struct PermissionRequested {
     pub allow_once_code: String,
     pub alternatives: Vec<String>,
     pub tool_input: Option<serde_json::Value>,
+    /// Command-risk justification for the decision (NX-PERM-002), if any.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub finding: Option<next_code_command_risk::RiskFinding>,
 }
 
 pub struct Bus {
@@ -540,6 +543,13 @@ impl Bus {
 
     pub fn subscribe(&self) -> broadcast::Receiver<BusEvent> {
         self.sender.subscribe()
+    }
+
+    /// Number of active bus subscribers, if the broadcast channel can report it.
+    /// Used to detect headless runs (no client dialog consumer) so permission
+    /// waits can fail fast instead of hanging (R13).
+    pub fn subscriber_count(&self) -> Option<usize> {
+        Some(self.sender.receiver_count())
     }
 
     pub fn publish(&self, event: BusEvent) {

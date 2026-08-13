@@ -1,4 +1,62 @@
 #[test]
+fn set_model_gates_api_only_pro_models_off_chatgpt_oauth_credentials() {
+    let _guard = next_code_base::storage::lock_test_env();
+    next_code_base::auth::codex::set_active_account_override(Some(
+        "openai-pro-gate".to_string(),
+    ));
+    next_code_base::provider::populate_account_models(vec![
+        "gpt-5.6-pro".to_string(),
+        "gpt-5.6".to_string(),
+    ]);
+
+    // OAuth-shaped credential: ChatGPT/Codex session.
+    let oauth_provider = OpenAIProvider::new(CodexCredentials {
+        access_token: "oauth-access".to_string(),
+        refresh_token: "oauth-refresh".to_string(),
+        id_token: Some("id-token".to_string()),
+        account_id: None,
+        expires_at: None,
+    });
+    let err = oauth_provider
+        .set_model("gpt-5.6-pro")
+        .expect_err("OAuth-shaped credential must reject an API-only Pro model");
+    let msg = format!("{err:#}");
+    assert!(
+        msg.contains("platform API key") && msg.contains("ChatGPT/Codex login"),
+        "error should explain the platform-key requirement, got: {msg}"
+    );
+    oauth_provider
+        .set_model("gpt-5.6")
+        .expect("OAuth-shaped credential must accept a non-Pro model");
+
+    // API-key-shaped credential: platform key, no refresh/id token. In
+    // production the platform key also lives in OPENAI_API_KEY (that is what
+    // `model_availability_for_account`'s api-key-only gate checks), so mirror
+    // that so the account-availability gate does not block the Pro model.
+    let previous_key = std::env::var_os("OPENAI_API_KEY");
+    next_code_base::env::set_var("OPENAI_API_KEY", "sk-platform-key");
+    next_code_base::auth::AuthStatus::invalidate_cached_status();
+    let api_key_provider = OpenAIProvider::new(CodexCredentials {
+        access_token: "sk-platform-key".to_string(),
+        refresh_token: String::new(),
+        id_token: None,
+        account_id: None,
+        expires_at: None,
+    });
+    api_key_provider
+        .set_model("gpt-5.6-pro")
+        .expect("API-key-shaped credential must accept the Pro model");
+    assert_eq!(api_key_provider.model(), "gpt-5.6-pro");
+    match previous_key {
+        Some(value) => next_code_base::env::set_var("OPENAI_API_KEY", value),
+        None => next_code_base::env::remove_var("OPENAI_API_KEY"),
+    }
+    next_code_base::auth::AuthStatus::invalidate_cached_status();
+
+    next_code_base::auth::codex::set_active_account_override(None);
+}
+
+#[test]
 fn test_openai_supports_codex_models() {
     let _guard = next_code_base::storage::lock_test_env();
     next_code_base::auth::codex::set_active_account_override(Some(

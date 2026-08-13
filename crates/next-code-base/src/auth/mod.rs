@@ -11,6 +11,7 @@ pub mod doctor;
 pub mod external;
 pub mod gemini;
 pub mod google;
+pub mod grok_build;
 pub(crate) mod google_oauth;
 pub mod integration;
 pub mod lifecycle;
@@ -188,7 +189,8 @@ fn available_provider_base_readiness(provider: LoginProviderDescriptor) -> AuthR
         | crate::provider_catalog::LoginProviderTarget::Copilot
         | crate::provider_catalog::LoginProviderTarget::Gemini
         | crate::provider_catalog::LoginProviderTarget::Antigravity
-        | crate::provider_catalog::LoginProviderTarget::Google => AuthReadinessLevel::Authenticated,
+        | crate::provider_catalog::LoginProviderTarget::Google
+        | crate::provider_catalog::LoginProviderTarget::GrokBuild => AuthReadinessLevel::Authenticated,
         _ => AuthReadinessLevel::CredentialPresent,
     }
 }
@@ -349,6 +351,7 @@ impl AuthStatus {
             LoginProviderAuthStateKey::Gemini => self.gemini,
             LoginProviderAuthStateKey::Cursor => self.cursor,
             LoginProviderAuthStateKey::Google => self.google,
+            LoginProviderAuthStateKey::GrokBuild => self.grok_build,
         }
     }
 
@@ -1096,6 +1099,15 @@ fn assessment_for_key(
                 },
                 AuthRefreshSupport::Automatic,
                 AuthValidationMethod::TimestampCheck,
+            )
+        }
+        LoginProviderAuthStateKey::GrokBuild => {
+            (
+                AuthCredentialSource::LocalCliSession,
+                "Grok CLI cached login (credential remains owned by Grok CLI)".to_string(),
+                AuthExpiryConfidence::Unknown,
+                AuthRefreshSupport::ExternalManaged,
+                AuthValidationMethod::CommandProbe,
             )
         }
         | LoginProviderAuthStateKey::Azure

@@ -357,6 +357,15 @@ fn choice_for_login_provider_round_trips_core_targets() {
         choice_for_login_provider(provider_catalog::AUTO_IMPORT_LOGIN_PROVIDER),
         None
     );
+    assert_eq!(
+        choice_for_login_provider(provider_catalog::GROK_BUILD_LOGIN_PROVIDER),
+        Some(ProviderChoice::GrokBuild)
+    );
+    assert_eq!(ProviderChoice::GrokBuild.as_arg_value(), "grok-build");
+    assert_eq!(
+        ProviderChoice::provider_choice_from_str("grok-build"),
+        Some(ProviderChoice::GrokBuild)
+    );
 }
 
 #[test]

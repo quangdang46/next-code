@@ -602,10 +602,17 @@ async fn gmail_is_exposed_by_default_and_can_be_explicitly_disabled() {
         tool_names.iter().any(|name| name == tool_name),
         "{tool_name} must be listed as model-visible by default"
     );
-    agent
+    // `gmail` is exposed by default but requires permission in Default mode
+    // (it is not a legacy auto-allowed action). Headless (no permission dialog
+    // consumer), the wait must fail fast with a clear error, never hang (R13).
+    let err = agent
         .validate_tool_allowed(tool_name, None)
         .await
-        .expect("gmail must be executable by default");
+        .expect_err("gmail must require permission, not hang");
+    assert!(
+        err.to_string().contains("Permission required"),
+        "headless permission wait must explain the missing dialog: {err}"
+    );
 
     crate::env::set_var("NEXT_CODE_DISABLED_TOOLS", tool_name);
     crate::config::Config::invalidate_cache();
@@ -1235,4 +1242,95 @@ fn guardrail_notice_absent_for_normal_turns() {
     // Normal turn with visible text: no notice.
     assert!(Agent::provider_guardrail_notice(Some("end_turn"), false, false).is_none());
     assert!(Agent::provider_guardrail_notice(None, false, true).is_none());
+}
+
+#[tokio::test]
+async fn repair_missing_tool_outputs_after_interrupt_is_non_error_notice() {
+    let _guard = crate::storage::lock_test_env();
+    let provider: Arc<dyn Provider> = Arc::new(NativeAutoCompactionProvider);
+    let registry = Registry::new(provider.clone()).await;
+    let mut agent = Agent::new(provider, registry);
+
+    // An assistant ToolUse with no ToolResult yet — as left behind when a turn
+    // is cancelled mid-tool.
+    agent.add_message(
+        Role::Assistant,
+        vec![ContentBlock::ToolUse {
+            id: "toolu_cancelled".to_string(),
+            name: "bash".to_string(),
+            input: serde_json::json!({"command": "sleep 10"}),
+            thought_signature: None,
+        }],
+    );
+
+    // Mark the turn interrupted (cancel/Esc), as the turn machinery would.
+    agent.request_graceful_shutdown();
+
+    let repaired = agent.repair_missing_tool_outputs();
+    assert_eq!(repaired, 1, "orphan ToolUse must be repaired");
+
+    let last = agent
+        .session
+        .messages
+        .last()
+        .expect("repair inserted a message");
+    assert_eq!(last.role, Role::User);
+    let block = last.content.first().expect("repaired message has a block");
+    match block {
+        ContentBlock::ToolResult {
+            tool_use_id,
+            content,
+            is_error,
+        } => {
+            assert_eq!(tool_use_id, "toolu_cancelled");
+            assert_eq!(
+                content.as_str(),
+                TOOL_OUTPUT_INTERRUPTED_TEXT,
+                "interrupted repair must be the non-error interruption notice"
+            );
+            assert_eq!(
+                is_error,
+                &Some(false),
+                "interrupted repair must NOT be flagged as an error"
+            );
+        }
+        other => panic!("expected ToolResult, got {other:?}"),
+    }
+}
+
+#[tokio::test]
+async fn repair_missing_tool_outputs_normal_turn_stays_error() {
+    let _guard = crate::storage::lock_test_env();
+    let provider: Arc<dyn Provider> = Arc::new(NativeAutoCompactionProvider);
+    let registry = Registry::new(provider.clone()).await;
+    let mut agent = Agent::new(provider, registry);
+
+    agent.add_message(
+        Role::Assistant,
+        vec![ContentBlock::ToolUse {
+            id: "toolu_normal".to_string(),
+            name: "bash".to_string(),
+            input: serde_json::json!({"command": "ls"}),
+            thought_signature: None,
+        }],
+    );
+
+    // No interrupt: an orphan ToolUse is a genuine missing output.
+    let repaired = agent.repair_missing_tool_outputs();
+    assert_eq!(repaired, 1);
+
+    let last = agent
+        .session
+        .messages
+        .last()
+        .expect("repair inserted a message");
+    match last.content.first().expect("repaired message has a block") {
+        ContentBlock::ToolResult {
+            content, is_error, ..
+        } => {
+            assert_eq!(content.as_str(), TOOL_OUTPUT_MISSING_TEXT);
+            assert_eq!(is_error, &Some(true));
+        }
+        other => panic!("expected ToolResult, got {other:?}"),
+    }
 }

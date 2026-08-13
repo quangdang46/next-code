@@ -173,6 +173,16 @@ impl MultiProvider {
                     ))
                 }
             }
+            ActiveProvider::GrokBuild => {
+                if let Some(grok) = self.grok_build_provider() {
+                    grok.complete(messages, tools, system, resume_session_id)
+                        .await
+                } else {
+                    Err(anyhow::anyhow!(
+                        "Grok Build provider not available. Install the Grok CLI and run `grok login`."
+                    ))
+                }
+            }
         }
     }
 
@@ -347,6 +357,22 @@ impl MultiProvider {
                 } else {
                     Err(anyhow::anyhow!(
                         "OpenRouter credentials not available. Set OPENROUTER_API_KEY environment variable."
+                    ))
+                }
+            }
+            ActiveProvider::GrokBuild => {
+                if let Some(grok) = self.grok_build_provider() {
+                    grok.complete_split(
+                        messages,
+                        tools,
+                        system_static,
+                        system_dynamic,
+                        resume_session_id,
+                    )
+                    .await
+                } else {
+                    Err(anyhow::anyhow!(
+                        "Grok Build provider not available. Install the Grok CLI and run `grok login`."
                     ))
                 }
             }

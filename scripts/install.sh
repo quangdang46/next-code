@@ -60,9 +60,6 @@ install_exit() {
   trap - EXIT
   set +e
   [ -z "$tmpdir" ] || rm -rf "$tmpdir"
-  if [ "$INSTALL_SUCCEEDED" = "1" ] && [ "$status" = "0" ]; then
-  else
-  fi
   exit "$status"
 }
 trap install_exit EXIT
@@ -138,6 +135,7 @@ stable_dir="$builds_dir/stable"
 current_dir="$builds_dir/current"
 version_dir="$builds_dir/versions"
 launcher_path="$INSTALL_DIR/next-code${EXE}"
+compat_launcher_path="$INSTALL_DIR/nextcode${EXE}"
 
 EXISTING=""
 if [ -x "$launcher_path" ]; then
@@ -227,8 +225,6 @@ if [ "$IS_WINDOWS" = true ]; then
   cp -f "$dest_version_dir/$bin_name" "$stable_dir/$bin_name"
   printf '%s\n' "$version" > "$builds_dir/stable-version"
   cp -f "$stable_dir/$bin_name" "$launcher_path"
-  # Compat copy for one release so existing `next-code` muscle memory keeps working.
-  cp -f "$stable_dir/$bin_name" "$compat_launcher_path"
 else
   ln -sfn "$dest_version_dir/$bin_name" "$stable_dir/$bin_name"
   printf '%s\n' "$version" > "$builds_dir/stable-version"
@@ -243,8 +239,6 @@ EOF
   else
     ln -sfn "$stable_dir/$bin_name" "$launcher_path"
   fi
-  # Compat symlink for one release.
-  ln -sfn "next-code${EXE}" "$compat_launcher_path"
 fi
 
 if [ "$(uname -s)" = "Darwin" ]; then

@@ -199,6 +199,7 @@ impl YoloClassifier {
                 reason: "Circuit breaker tripped".into(),
                 allow_once_code: String::new(),
                 alternatives: vec![],
+                finding: None,
             };
         }
 
@@ -220,6 +221,7 @@ impl YoloClassifier {
                     reason: "YOLO stage 1 blocked".into(),
                     allow_once_code: String::new(),
                     alternatives: vec![],
+                    finding: None,
                 };
             }
         }
@@ -236,6 +238,7 @@ impl YoloClassifier {
                         reason: "YOLO stage 2 blocked".into(),
                         allow_once_code: String::new(),
                         alternatives: vec![],
+                        finding: None,
                     }
                 }
             }
@@ -246,6 +249,7 @@ impl YoloClassifier {
                     reason: "YOLO classifier error".into(),
                     allow_once_code: String::new(),
                     alternatives: vec![],
+                    finding: None,
                 }
             }
         }

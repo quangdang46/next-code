@@ -6,7 +6,7 @@ use crate::todo::{
     load_goals, load_todos, newly_completed_groups_have_sufficient_ownership, save_goals,
     save_todos,
 };
-use anyhow::Result;
+use anyhow::{Result, bail};
 use async_trait::async_trait;
 use serde::Deserialize;
 use serde_json::{Value, json};
@@ -54,6 +54,21 @@ fn merge_confidence_history(previous: &[TodoItem], incoming: &mut [TodoItem]) {
 struct TodoInput {
     todos: Option<Vec<TodoItem>>,
     goals: Option<Vec<TodoGoal>>,
+}
+
+fn parse_todo_input(input: Value) -> Result<TodoInput> {
+    let params: TodoInput = serde_json::from_value(normalize_todo_input(input))?;
+    if let Some(todo) = params.todos.as_ref().and_then(|todos| {
+        todos
+            .iter()
+            .find(|todo| crate::todo::canonical_todo_status(&todo.status).is_none())
+    }) {
+        bail!(
+            "invalid todo status {:?}; expected one of: pending, in_progress, completed, cancelled",
+            todo.status
+        );
+    }
+    Ok(params)
 }
 
 /// Normalize a goal's group label: trimmed, with empty/whitespace collapsed
@@ -199,8 +214,8 @@ fn take_reframe_nudges(goals: &[TodoGoal], todos: &[TodoItem]) -> Vec<String> {
         }
         let group_open = todos.iter().any(|todo| {
             goal_group_key(todo.group.as_deref()) == goal.group
-                && todo.status != "completed"
-                && todo.status != "cancelled"
+                && !crate::todo::todo_status_is_completed(&todo.status)
+                && !crate::todo::todo_status_is_cancelled(&todo.status)
         });
         if !group_open {
             continue;
@@ -218,7 +233,7 @@ fn build_todo_output(
 ) -> Result<ToolOutput> {
     let remaining = todos
         .iter()
-        .filter(|todo| todo.status != "completed")
+        .filter(|todo| !crate::todo::todo_status_is_completed(&todo.status))
         .count();
     let mut text = serde_json::to_string_pretty(&todos)?;
     if !goals.is_empty() {
@@ -282,6 +297,12 @@ fn normalize_todo_input(mut input: Value) -> Value {
                 let Some(fields) = item.as_object_mut() else {
                     continue;
                 };
+                if key == "todos"
+                    && let Some(Value::String(status)) = fields.get_mut("status")
+                    && let Some(canonical) = crate::todo::canonical_todo_status(status)
+                {
+                    *status = canonical.to_string();
+                }
                 for key in [
                     "confidence",
                     "completion_confidence",
@@ -356,8 +377,8 @@ impl Tool for TodoTool {
                                 "description": "Task."
                             },
                             "status": {
-                                "type": "string",
-                                "description": "Status."
+                                "enum": ["pending", "in_progress", "completed", "cancelled"],
+                                "description": "Status. Use completed when the task is done."
                             },
                             "priority": {
                                 "type": "string",
@@ -435,7 +456,7 @@ impl Tool for TodoTool {
     }
 
     async fn execute(&self, input: Value, ctx: ToolContext) -> Result<ToolOutput> {
-        let params: TodoInput = serde_json::from_value(normalize_todo_input(input))?;
+        let params = parse_todo_input(input)?;
         let operation = if params.todos.is_some() || params.goals.is_some() {
             "write"
         } else {
@@ -610,8 +631,8 @@ mod tests {
         }
     }
 
-    fn parse(input: Value) -> Result<TodoInput, serde_json::Error> {
-        serde_json::from_value(normalize_todo_input(input))
+    fn parse(input: Value) -> Result<TodoInput> {
+        parse_todo_input(input)
     }
 
     #[test]
@@ -624,6 +645,39 @@ mod tests {
         assert_eq!(todos.len(), 1);
         assert_eq!(todos[0].content, "a");
         assert_eq!(todos[0].confidence, Some(90));
+    }
+
+    #[test]
+    fn normalizes_natural_and_case_varied_todo_statuses() {
+        let parsed = parse(json!({
+            "todos": [
+                {"content": "a", "status": "done", "priority": "high", "id": "1", "confidence": 90},
+                {"content": "b", "status": " Finished ", "priority": "low", "id": "2", "confidence": 80},
+                {"content": "c", "status": "Canceled", "priority": "low", "id": "3", "confidence": 70}
+            ]
+        }))
+        .expect("status synonyms should parse");
+        let statuses: Vec<_> = parsed
+            .todos
+            .expect("todos present")
+            .into_iter()
+            .map(|todo| todo.status)
+            .collect();
+        assert_eq!(statuses, ["completed", "completed", "cancelled"]);
+    }
+
+    #[test]
+    fn rejects_unknown_todo_statuses_with_valid_vocabulary() {
+        let error = parse(json!({
+            "todos": [
+                {"content": "a", "status": "blocked", "priority": "high", "id": "1", "confidence": 90}
+            ]
+        }))
+        .err()
+        .expect("unknown status should be rejected");
+        let message = error.to_string();
+        assert!(message.contains("invalid todo status \"blocked\""));
+        assert!(message.contains("pending, in_progress, completed, cancelled"));
     }
 
     #[test]

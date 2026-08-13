@@ -4,6 +4,42 @@ use std::path::PathBuf;
 
 pub use next_code_task_types::{TodoGoal, TodoGoalChange, TodoGoalField, TodoItem};
 
+/// Return the canonical todo status for model-written status vocabulary.
+///
+/// The todo tool historically accepted any string, so persisted sessions can
+/// contain natural completion synonyms such as `done` or `finished`. Keep this
+/// helper tolerant for those sessions even though new tool calls advertise a
+/// constrained vocabulary.
+pub fn canonical_todo_status(status: &str) -> Option<&'static str> {
+    let status = status.trim();
+    if status.eq_ignore_ascii_case("pending") {
+        Some("pending")
+    } else if status.eq_ignore_ascii_case("in_progress")
+        || status.eq_ignore_ascii_case("in progress")
+        || status.eq_ignore_ascii_case("in-progress")
+    {
+        Some("in_progress")
+    } else if status.eq_ignore_ascii_case("completed")
+        || status.eq_ignore_ascii_case("complete")
+        || status.eq_ignore_ascii_case("done")
+        || status.eq_ignore_ascii_case("finished")
+    {
+        Some("completed")
+    } else if status.eq_ignore_ascii_case("cancelled") || status.eq_ignore_ascii_case("canceled") {
+        Some("cancelled")
+    } else {
+        None
+    }
+}
+
+pub fn todo_status_is_completed(status: &str) -> bool {
+    canonical_todo_status(status) == Some("completed")
+}
+
+pub fn todo_status_is_cancelled(status: &str) -> bool {
+    canonical_todo_status(status) == Some("cancelled")
+}
+
 /// Minimum passing score for 0-100 quality assessments. Scores below this do
 /// not provide enough evidence to clear their respective quality gate.
 pub const QUALITY_GATE_THRESHOLD: u8 = 96;
@@ -39,7 +75,7 @@ fn group_is_complete(todos: &[TodoItem], group: &Option<String>) -> bool {
         .iter()
         .filter(|todo| normalized_group(todo.group.as_deref()) == *group)
         .peekable();
-    matching.peek().is_some() && matching.all(|todo| todo.status == "completed")
+    matching.peek().is_some() && matching.all(|todo| todo_status_is_completed(&todo.status))
 }
 
 /// Whether every group newly closed by this update has a sufficient assessment

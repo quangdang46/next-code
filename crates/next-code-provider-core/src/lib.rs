@@ -40,8 +40,8 @@ pub use models::{
     ALL_CLAUDE_MODELS, ALL_OPENAI_MODELS, DEFAULT_CLAUDE_MODEL, DEFAULT_CONTEXT_LIMIT,
     DEFAULT_OPENAI_MODEL, ModelCapabilities, context_limit_for_model,
     context_limit_for_model_with_provider, context_limit_for_model_with_provider_and_cache,
-    is_listable_model_name, normalize_copilot_model_name,
-    provider_for_model as core_provider_for_model,
+    is_listable_model_name, is_openai_api_only_pro_model, is_openai_api_only_pro_model_for_route,
+    normalize_copilot_model_name, provider_for_model as core_provider_for_model,
     provider_for_model_with_hint as core_provider_for_model_with_hint, provider_key_from_hint,
 };
 pub use selection::{
@@ -310,6 +310,16 @@ pub trait Provider: Send + Sync {
     /// Returns true if the provider executes tools internally.
     fn handles_tools_internally(&self) -> bool {
         false
+    }
+
+    /// Tool names this provider executes internally (when
+    /// [`Self::handles_tools_internally`] is true). The turn loop retains only
+    /// these tool calls for local execution and feeds back results for the rest
+    /// via `sdk_tool_results`. Defaults to next-code's built-in native set;
+    /// providers that advertise more (e.g. Claude CLI's `memory`/`bg`) override
+    /// so their native tools are not silently dropped.
+    fn native_tool_names(&self) -> &'static [&'static str] {
+        &[]
     }
 
     /// Invalidate any cached credentials.
@@ -693,6 +703,7 @@ pub enum RuntimeKey {
     Cursor,
     Bedrock,
     Antigravity,
+    GrokBuild,
     CodeAssistOAuth,
     RemoteCatalog,
     Current,
@@ -713,6 +724,7 @@ impl RuntimeKey {
             ModelRouteApiMethod::Copilot => Self::Copilot,
             ModelRouteApiMethod::Cursor => Self::Cursor,
             ModelRouteApiMethod::Bedrock => Self::Bedrock,
+            ModelRouteApiMethod::GrokBuild => Self::GrokBuild,
             ModelRouteApiMethod::CodeAssistOAuth => Self::CodeAssistOAuth,
             ModelRouteApiMethod::AntigravityHttps => Self::Antigravity,
             ModelRouteApiMethod::RemoteCatalog => Self::RemoteCatalog,
@@ -737,6 +749,7 @@ impl RuntimeKey {
             Self::Cursor => "cursor".to_string(),
             Self::Bedrock => "bedrock".to_string(),
             Self::Antigravity => "antigravity".to_string(),
+            Self::GrokBuild => "grok-build".to_string(),
             Self::CodeAssistOAuth => "code-assist-oauth".to_string(),
             Self::RemoteCatalog => "remote-catalog".to_string(),
             Self::Current => "current".to_string(),
@@ -808,6 +821,7 @@ impl RouteSelection {
             RuntimeKey::Cursor => format!("cursor:{model}"),
             RuntimeKey::Bedrock => format!("bedrock:{model}"),
             RuntimeKey::Antigravity => format!("antigravity:{model}"),
+            RuntimeKey::GrokBuild => format!("grok-build:{model}"),
             RuntimeKey::Gemini
             | RuntimeKey::CodeAssistOAuth
             | RuntimeKey::RemoteCatalog
@@ -846,6 +860,7 @@ pub enum ModelRouteApiMethod {
     Copilot,
     Cursor,
     Bedrock,
+    GrokBuild,
     CodeAssistOAuth,
     AntigravityHttps,
     RemoteCatalog,
@@ -880,6 +895,7 @@ impl ModelRouteApiMethod {
             "copilot" => Self::Copilot,
             "cursor" => Self::Cursor,
             "bedrock" => Self::Bedrock,
+            "grok-build" | "grok-build-acp" => Self::GrokBuild,
             "code-assist-oauth" => Self::CodeAssistOAuth,
             "https" => Self::AntigravityHttps,
             "remote-catalog" => Self::RemoteCatalog,
@@ -949,6 +965,7 @@ impl ModelRouteApiMethod {
             Self::Copilot => "copilot".to_string(),
             Self::Cursor => "cursor".to_string(),
             Self::Bedrock => "bedrock".to_string(),
+            Self::GrokBuild => "grok-build".to_string(),
             Self::AntigravityHttps => "https".to_string(),
             Self::RemoteCatalog => "remote-catalog".to_string(),
             Self::Current => "current".to_string(),

@@ -264,6 +264,7 @@ fn build_request(
     reason: &str,
     tool_call_id: &str,
     tool_input: Option<serde_json::Value>,
+    finding: Option<&next_code_command_risk::RiskFinding>,
 ) -> acp::RequestPermissionRequest {
     let kind = classify_permission_card(tool_name);
     let call_id = if tool_call_id.is_empty() {
@@ -291,6 +292,22 @@ fn build_request(
         req = req.meta(Some(meta));
     }
 
+    // NX-PERM-001: attach the command-risk finding (level + justification) to
+    // the ACP request meta so the Face permission view can render the
+    // "Why?" / risk line. Merge with any existing bash-highlight meta.
+    if let Some(finding) = finding {
+        let mut meta = req.meta.clone().unwrap_or_default();
+        meta.insert(
+            "risk_finding".to_string(),
+            serde_json::json!({
+                "level": format!("{:?}", finding.level),
+                "justification": finding.justification,
+                "description": finding.description(),
+            }),
+        );
+        req = req.meta(Some(meta));
+    }
+
     req
 }
 
@@ -307,6 +324,7 @@ pub(crate) async fn bridge_permission_request(
         allow_once_code,
         tool_input,
         tool_call_id,
+        finding,
         ..
     } = event
     else {
@@ -319,6 +337,7 @@ pub(crate) async fn bridge_permission_request(
         &reason,
         &tool_call_id,
         tool_input,
+        finding.as_ref(),
     );
     let reply_id = session.next_id();
     let outcome = match gateway.request_permission(args).await {

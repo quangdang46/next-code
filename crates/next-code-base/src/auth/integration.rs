@@ -67,6 +67,7 @@ pub fn runtime_id_for_login_provider(
         LoginProviderTarget::Antigravity => Some(RuntimeProviderId::Antigravity),
         // Google/Gmail auth is for tool access, not model-runtime routing.
         LoginProviderTarget::Google => None,
+        LoginProviderTarget::GrokBuild => Some(RuntimeProviderId::GrokBuild),
     }
 }
 

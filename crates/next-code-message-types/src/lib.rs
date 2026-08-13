@@ -333,6 +333,12 @@ impl Message {
 pub const TOOL_OUTPUT_MISSING_TEXT: &str =
     "Tool output missing (session interrupted before tool execution completed)";
 
+/// Interruption notice used when a turn was cancelled/aborted: the tool did not
+/// fail, it simply never ran to completion. Non-error so the model does not
+/// fabricate a phantom failure for a cancelled tool.
+pub const TOOL_OUTPUT_INTERRUPTED_TEXT: &str =
+    "Tool execution interrupted (session cancelled before tool completed)";
+
 const STABLE_HASH_SEED: u64 = 0xcbf29ce484222325;
 const STABLE_HASH_PRIME: u64 = 0x100000001b3;
 

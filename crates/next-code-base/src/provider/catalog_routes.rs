@@ -13,6 +13,14 @@ use super::{
     known_openai_model_ids, model_availability_for_account, openrouter,
     openrouter_catalog_model_id, provider_for_model, standard_openrouter_profile_configured,
 };
+use next_code_provider_core::is_openai_api_only_pro_model;
+
+/// Detail string shown on the OpenAI OAuth route of a GPT Pro model when the
+/// ChatGPT/Codex OAuth backend would reject it. The route stays visible (so
+/// users see why it cannot be selected) but is never selectable; the
+/// platform-API-key route carries the model.
+pub(crate) const OPENAI_API_ONLY_PRO_DETAIL: &str =
+    "requires an OpenAI platform API key (rejected by ChatGPT/Codex login)";
 
 /// Build the fast local route snapshot used by the TUI model picker while the
 /// full provider catalog is hydrating.
@@ -31,12 +39,20 @@ pub fn simplified_model_routes_for_picker(
     for model in display_models {
         if !model.contains('/') && provider_for_model(&model) == Some("openai") {
             if auth.openai_has_oauth {
+                // GPT Pro models are API-key-only: the ChatGPT/Codex OAuth
+                // backend rejects them, so the OAuth route stays visible but is
+                // never selectable. The API-key route (below) carries them.
+                let available = !is_openai_api_only_pro_model(&model);
                 routes.push(ModelRoute {
                     model: model.clone(),
                     provider: "OpenAI".to_string(),
                     api_method: "openai-oauth".to_string(),
-                    available: true,
-                    detail: String::new(),
+                    available,
+                    detail: if available {
+                        String::new()
+                    } else {
+                        OPENAI_API_ONLY_PRO_DETAIL.to_string()
+                    },
                     cheapness: None,
                 });
             }
@@ -375,7 +391,20 @@ fn append_openai_routes(
             }
         };
         if openai_auth.openai_has_oauth {
-            routes.push(build_openai_oauth_route(&model, available, detail.clone()));
+            // GPT Pro models are API-key-only: the ChatGPT/Codex OAuth backend
+            // rejects them ("not supported when using Codex with a ChatGPT
+            // account"). Keep the OAuth route visible so the "requires a
+            // platform API key" affordance survives, but never selectable.
+            let (oauth_available, oauth_detail) = if is_openai_api_only_pro_model(&model) {
+                (false, OPENAI_API_ONLY_PRO_DETAIL.to_string())
+            } else {
+                (available, detail.clone())
+            };
+            routes.push(build_openai_oauth_route(
+                &model,
+                oauth_available,
+                oauth_detail,
+            ));
         }
         if openai_auth.openai_has_api_key {
             routes.push(build_openai_api_key_route(
@@ -914,7 +943,15 @@ pub fn remote_model_routes_fallback(
                     ),
                 }
             };
-            routes.push(build_openai_oauth_route(model, available, detail));
+            if is_openai_api_only_pro_model(model) {
+                routes.push(build_openai_oauth_route(
+                    model,
+                    false,
+                    OPENAI_API_ONLY_PRO_DETAIL,
+                ));
+            } else {
+                routes.push(build_openai_oauth_route(model, available, detail));
+            }
             added_any = true;
         }
 
@@ -1364,5 +1401,83 @@ mod tests {
                 .any(|r| r.model == "gpt-5.3-codex" && r.api_method == "openrouter"),
             "catalog-listed model keeps its OpenRouter fallback route"
         );
+    }
+}
+
+#[cfg(test)]
+mod pro_model_route_tests {
+    use super::*;
+
+    fn with_no_openai_api_key<T>(f: impl FnOnce() -> T) -> T {
+        let previous = std::env::var_os("OPENAI_API_KEY");
+        crate::env::remove_var("OPENAI_API_KEY");
+        // Drop any cached auth probe so the next read re-derives from the env.
+        crate::auth::AuthStatus::invalidate_cached_status();
+        let result = f();
+        match previous {
+            Some(value) => crate::env::set_var("OPENAI_API_KEY", value),
+            None => crate::env::remove_var("OPENAI_API_KEY"),
+        }
+        crate::auth::AuthStatus::invalidate_cached_status();
+        result
+    }
+
+    /// The remote names-only fallback pushes the OpenAI OAuth route for every
+    /// known OpenAI model. An API-only Pro model must come back
+    /// visible-but-unavailable with the platform-key detail even when the auth
+    /// state is "no credentials"; the non-Pro model keeps its normal behavior.
+    #[test]
+    fn remote_fallback_oauth_route_blocks_pro_models_without_api_key() {
+        let _guard = crate::storage::lock_test_env();
+        crate::provider::models::reset_model_catalog_services_for_tests();
+        with_no_openai_api_key(|| {
+            let routes = remote_model_routes_fallback(
+                None,
+                &["gpt-5.6-pro".to_string(), "gpt-5.6".to_string()],
+            );
+
+            let pro = routes
+                .iter()
+                .find(|route| route.model == "gpt-5.6-pro" && route.api_method == "openai-oauth")
+                .expect("pro oauth route stays visible");
+            assert!(!pro.available, "pro oauth route must not be selectable");
+            assert_eq!(
+                pro.detail,
+                "requires an OpenAI platform API key (rejected by ChatGPT/Codex login)"
+            );
+
+            let regular = routes
+                .iter()
+                .find(|route| route.model == "gpt-5.6" && route.api_method == "openai-oauth")
+                .expect("non-pro oauth route present");
+            assert!(!regular.available, "no credentials -> non-pro also unavailable");
+        });
+    }
+
+    /// `model_availability_for_account` is the account-level gate: without an
+    /// OpenAI platform API key an API-only Pro model is never available, no
+    /// matter what the OAuth-scoped account snapshot claims.
+    #[test]
+    fn account_availability_gates_pro_models_without_api_key() {
+        let _guard = crate::storage::lock_test_env();
+        crate::provider::models::reset_model_catalog_services_for_tests();
+        with_no_openai_api_key(|| {
+            let availability = model_availability_for_account("gpt-5.6-pro");
+            assert_eq!(
+                availability.state,
+                AccountModelAvailabilityState::Unavailable
+            );
+            assert_eq!(availability.source, "api-key-only");
+            let detail = format_account_model_availability_detail(&availability)
+                .unwrap_or_default();
+            assert!(
+                detail.contains("platform API key"),
+                "detail should explain the platform-key requirement, got: {detail}"
+            );
+
+            // Non-Pro models are unaffected by the gate.
+            let regular = model_availability_for_account("gpt-5.6");
+            assert_ne!(regular.source, "api-key-only");
+        });
     }
 }

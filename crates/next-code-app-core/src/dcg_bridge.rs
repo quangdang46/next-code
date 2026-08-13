@@ -43,6 +43,11 @@ use next_code_hooks::{DispatchConfig, HookContext, HookEvent, HookInputBuilder, 
 pub use crate::yolo_classifier::YoloClassifier;
 pub use dcg_core::Mode;
 
+/// R13: how long `await_permission_response` waits for a dialog responder
+/// before failing fast (headless runs have no responder; without this the
+/// channel would block forever).
+const PERMISSION_RESPONSE_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(600);
+
 /// Globally configured permission mode. Set once during CLI startup, read
 /// from every `SafetySystem::classify` call.
 ///
@@ -339,10 +344,14 @@ pub async fn await_permission_response() -> anyhow::Result<bool> {
         }
         rx
     };
-    match rx.await {
-        Ok(true) => Ok(true),
-        Ok(false) => Ok(false),
-        Err(_) => Err(anyhow::anyhow!("Permission request cancelled")),
+    match tokio::time::timeout(PERMISSION_RESPONSE_TIMEOUT, rx).await {
+        Ok(Ok(true)) => Ok(true),
+        Ok(Ok(false)) => Ok(false),
+        Ok(Err(_)) => Err(anyhow::anyhow!("Permission request cancelled")),
+        Err(_) => Err(anyhow::anyhow!(
+            "Permission request timed out after {}s without a response",
+            PERMISSION_RESPONSE_TIMEOUT.as_secs()
+        )),
     }
 }
 
@@ -666,6 +675,7 @@ pub fn classify_for_session(action: &str, session_id: &str) -> BridgeDecision {
             } => BridgeDecision::Deny {
                 reason,
                 alternatives,
+                finding: None,
             },
             PolicyDecision::Prompt {
                 reason,
@@ -675,6 +685,7 @@ pub fn classify_for_session(action: &str, session_id: &str) -> BridgeDecision {
                 reason,
                 allow_once_code,
                 alternatives,
+                finding: None,
             },
         };
     }
@@ -703,6 +714,8 @@ pub enum BridgeDecision {
         allow_once_code: String,
         /// Suggested safer alternatives (e.g. "use `git stash` first").
         alternatives: Vec<String>,
+        /// Optional command-risk justification for the decision (NX-PERM-002).
+        finding: Option<RiskFinding>,
     },
     /// dcg-core denied outright (e.g. `Plan` mode + write effect).
     Deny {
@@ -710,7 +723,38 @@ pub enum BridgeDecision {
         reason: String,
         /// Suggested safer alternatives.
         alternatives: Vec<String>,
+        /// Optional command-risk justification for the decision (NX-PERM-002).
+        finding: Option<RiskFinding>,
     },
+}
+
+impl BridgeDecision {
+    /// The command-risk justification attached to this decision, if any
+    /// (NX-PERM-002).
+    pub fn finding(&self) -> Option<&RiskFinding> {
+        match self {
+            BridgeDecision::Allow => None,
+            BridgeDecision::Prompt { finding, .. } | BridgeDecision::Deny { finding, .. } => {
+                finding.as_ref()
+            }
+        }
+    }
+}
+
+/// A command-risk justification attached to a [`BridgeDecision`].
+///
+/// Re-exported from `next-code-command-risk` so callers can pattern-match on
+/// decisions without importing the crate directly (NX-PERM-002). The
+/// `RiskLevel` enum is deliberately NOT re-exported: dcg_bridge already has a
+/// local `RiskLevel` used by the legacy permission explainer.
+pub use next_code_command_risk::RiskFinding;
+
+/// Assess a shell command with the command-risk classifier and return the
+/// finding, or `None` for non-shell actions (NX-PERM-002).
+fn risk_finding_for_command(command: &str) -> Option<RiskFinding> {
+    let ctx = next_code_command_risk::RiskContext::from_env(None);
+    let assessment = next_code_command_risk::assess(command, &ctx);
+    assessment.findings.first().cloned()
 }
 
 /// Classify a next-code action via dcg-core. The caller is responsible for
@@ -774,6 +818,7 @@ pub fn classify_with_mode(action: &str, mode: Mode) -> BridgeDecision {
             ),
             allow_once_code: String::new(),
             alternatives: vec![],
+            finding: None,
         };
     }
 
@@ -804,6 +849,7 @@ pub fn classify_with_mode(action: &str, mode: Mode) -> BridgeDecision {
                 reason: "Session poisoned".into(),
                 allow_once_code: String::new(),
                 alternatives: vec![],
+                finding: None,
             };
         }
     };
@@ -818,6 +864,7 @@ pub fn classify_with_mode(action: &str, mode: Mode) -> BridgeDecision {
             reason,
             allow_once_code,
             alternatives,
+            finding: None,
         },
         Decision::Deny {
             reason,
@@ -825,6 +872,7 @@ pub fn classify_with_mode(action: &str, mode: Mode) -> BridgeDecision {
         } => BridgeDecision::Deny {
             reason,
             alternatives,
+            finding: None,
         },
     }
 }
@@ -1526,6 +1574,7 @@ pub fn classify_command(tool_name: &str, command: &str, session_id: &str) -> Bri
             } => BridgeDecision::Deny {
                 reason,
                 alternatives,
+                finding: None,
             },
             crate::execution_policy::PolicyDecision::Prompt {
                 reason,
@@ -1535,6 +1584,7 @@ pub fn classify_command(tool_name: &str, command: &str, session_id: &str) -> Bri
                 reason,
                 allow_once_code,
                 alternatives,
+                finding: risk_finding_for_command(command),
             },
         };
     }
@@ -1546,9 +1596,7 @@ pub fn classify_command(tool_name: &str, command: &str, session_id: &str) -> Bri
 
     // Deletion-shaped commands always ask (Claude-like) unless YOLO/Bypass.
     // Plan mode falls through so the engine can Deny mutating shell.
-    if destructive
-        && !matches!(mode, Mode::BypassPermissions | Mode::Plan)
-    {
+    if destructive && !matches!(mode, Mode::BypassPermissions | Mode::Plan) {
         return BridgeDecision::Prompt {
             reason: format!(
                 "Destructive command requires approval: {}",
@@ -1556,6 +1604,7 @@ pub fn classify_command(tool_name: &str, command: &str, session_id: &str) -> Bri
             ),
             allow_once_code: String::new(),
             alternatives: vec![],
+            finding: risk_finding_for_command(command),
         };
     }
 
@@ -1580,6 +1629,7 @@ pub fn classify_command(tool_name: &str, command: &str, session_id: &str) -> Bri
             ),
             allow_once_code: String::new(),
             alternatives: vec![],
+            finding: risk_finding_for_command(command),
         };
     }
 
@@ -1599,6 +1649,7 @@ pub fn classify_command(tool_name: &str, command: &str, session_id: &str) -> Bri
                 reason: "Session poisoned".into(),
                 allow_once_code: String::new(),
                 alternatives: vec![],
+                finding: None,
             };
         }
     };
@@ -1613,6 +1664,7 @@ pub fn classify_command(tool_name: &str, command: &str, session_id: &str) -> Bri
             reason,
             allow_once_code,
             alternatives,
+            finding: risk_finding_for_command(command),
         },
         Decision::Deny {
             reason,
@@ -1620,6 +1672,7 @@ pub fn classify_command(tool_name: &str, command: &str, session_id: &str) -> Bri
         } => BridgeDecision::Deny {
             reason,
             alternatives,
+            finding: risk_finding_for_command(command),
         },
     }
 }
@@ -1689,7 +1742,9 @@ mod destructive_shell_tests {
         assert!(is_destructive_shell_command("del /f file.txt"));
         assert!(!is_destructive_shell_command("ls -la"));
         assert!(!is_destructive_shell_command("cargo test"));
-        assert!(!is_destructive_shell_command("echo talking about removals in docs"));
+        assert!(!is_destructive_shell_command(
+            "echo talking about removals in docs"
+        ));
     }
 
     #[test]
@@ -1701,10 +1756,7 @@ mod destructive_shell_tests {
         set_session_mode(sid, Mode::Default);
 
         assert!(
-            matches!(
-                classify_command("bash", "ls", sid),
-                BridgeDecision::Allow
-            ),
+            matches!(classify_command("bash", "ls", sid), BridgeDecision::Allow),
             "non-destructive bash may use session allow"
         );
         assert!(
@@ -1729,5 +1781,132 @@ mod destructive_shell_tests {
             BridgeDecision::Allow
         ));
         clear_session_mode(sid);
+    }
+}
+
+#[cfg(test)]
+mod perm002_finding_tests {
+    use super::*;
+
+    /// NX-PERM-002: destructive-command decisions carry a command-risk finding
+    /// with a RiskLevel and justification, without changing the decision
+    /// outcome (DCG stays authoritative).
+    #[test]
+    fn classify_command_prompt_for_destructive_carries_finding() {
+        let sid = "sess-perm002-destructive";
+        clear_session_mode(sid);
+
+        // A destructive command with a protected target escalates to Critical
+        // and must surface its finding on the Prompt decision.
+        let decision = classify_command("bash", "rm -rf /", sid);
+        match &decision {
+            BridgeDecision::Prompt {
+                finding: Some(finding),
+                ..
+            } => {
+                assert_eq!(
+                    finding.level,
+                    next_code_command_risk::RiskLevel::Critical,
+                    "rm -rf / must be Critical risk"
+                );
+                assert!(
+                    !finding.justification.is_empty(),
+                    "finding must carry a justification"
+                );
+            }
+            other => panic!("expected Prompt with finding for destructive command, got {other:?}"),
+        }
+
+        // A harmless command should not fabricate a command-risk finding.
+        let decision = classify_command("bash", "ls -la", sid);
+        assert!(
+            decision.finding().is_none(),
+            "harmless command must not carry a command-risk finding: {decision:?}"
+        );
+        clear_session_mode(sid);
+    }
+
+    /// NX-PERM-002: the `permission explain` CLI path prints a finding.
+    #[test]
+    fn risk_finding_for_command_returns_none_for_safe_commands() {
+        assert!(risk_finding_for_command("ls -la").is_none());
+        assert!(risk_finding_for_command("echo hello").is_none());
+        let finding = risk_finding_for_command("rm -rf /").expect("destructive has finding");
+        assert_eq!(finding.level, next_code_command_risk::RiskLevel::Critical);
+    }
+}
+
+#[cfg(test)]
+mod r11_r13_tests {
+    use super::*;
+
+    /// R11: `init_session_allow_list` must re-approve every `always_allow_tools`
+    /// entry for a session. `restore_session_with_working_dir` calls this after
+    /// clearing the previous session's tool policy, so always-allow survives a
+    /// resume.
+    #[test]
+    fn init_session_allow_list_approves_config_always_allow_tools() {
+        let sid = "sess-init-allow-list-r11";
+        clear_session_mode(sid);
+        // Start from a clean allow-list state.
+        clear_session_allowed_action(sid, "read");
+        clear_session_allowed_action(sid, "bash");
+
+        // `add_always_allow_tool` writes through the real config file in the
+        // test env (locked by lock_test_env), exercising the same source
+        // `init_session_allow_list` reads.
+        crate::config::Config::add_always_allow_tool("read")
+            .expect("add always-allow tool for test");
+        let config = crate::config::config();
+        assert!(
+            config.always_allow_tools.iter().any(|t| t == "read"),
+            "test config must contain the always-allow tool"
+        );
+
+        init_session_allow_list(sid);
+        let decision = classify_for_session("read", sid);
+        assert!(
+            matches!(decision, BridgeDecision::Allow),
+            "always-allow tool must be allowed after init_session_allow_list: {decision:?}"
+        );
+        // A tool that is NOT in always_allow_tools must not be pre-approved by
+        // the seed (it may still classify Allow via mode, but not via the
+        // session allow-list).
+        assert!(
+            !session_allows_action(sid, "bash"),
+            "bash must not be session-approved by init_session_allow_list"
+        );
+
+        clear_session_mode(sid);
+        clear_session_allowed_action(sid, "read");
+        clear_session_allowed_action(sid, "bash");
+    }
+
+    /// R13: `await_permission_response` must fail fast with a clear error when
+    /// there is no bus subscriber (headless `next-code run`) instead of hanging
+    /// forever. Tests run without any bus subscriber, so the no-responder error
+    /// path is exercised.
+    #[tokio::test]
+    async fn await_permission_response_fails_fast_without_responder() {
+        // This test process subscribes to nothing; if other tests leaked a
+        // subscriber we can't be sure, but with an empty bus the error path is
+        // deterministic.
+        let has_responder = crate::bus::Bus::global()
+            .subscriber_count()
+            .map(|count| count > 0)
+            .unwrap_or(true);
+        if has_responder {
+            // A subscriber exists (e.g. another test's bus subscription);
+            // timeout would take 600s so skip rather than hang the suite.
+            return;
+        }
+
+        let result = await_permission_response().await;
+        let err = result.expect_err("headless permission wait must error, not hang");
+        let msg = err.to_string();
+        assert!(
+            msg.contains("Permission required") || msg.contains("permission dialog"),
+            "error must explain the missing dialog: {msg}"
+        );
     }
 }
