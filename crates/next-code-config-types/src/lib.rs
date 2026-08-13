@@ -1240,6 +1240,11 @@ pub struct ProviderConfig {
     pub default_model: Option<String>,
     /// Default provider to use (claude|openai|copilot|openrouter)
     pub default_provider: Option<String>,
+    /// Pinned credential route (R5): "claude-api" / "openai-api" when an
+    /// explicit API-key login must win over OAuth on standalone runs; `None`
+    /// leaves the provider's auto (OAuth-first) resolution in charge.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub runtime_provider_pin: Option<String>,
     /// Reasoning effort for OpenAI Responses API (none|low|medium|high|xhigh)
     pub openai_reasoning_effort: Option<String>,
     /// Reasoning effort for Anthropic Messages API output_config (none|low|medium|high|xhigh; max aliases to strongest supported)
@@ -1280,6 +1285,7 @@ impl Default for ProviderConfig {
         Self {
             default_model: None,
             default_provider: None,
+            runtime_provider_pin: None,
             openai_reasoning_effort: Some("low".to_string()),
             anthropic_reasoning_effort: None,
             openai_transport: None,

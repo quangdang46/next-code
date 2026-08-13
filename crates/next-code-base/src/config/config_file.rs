@@ -157,6 +157,20 @@ impl Config {
         Self::set_default_model(cfg.provider.default_model.as_deref(), provider)
     }
 
+    /// Persist the runtime-provider credential-route pin (R5): "claude-api" /
+    /// "openai-api" after an explicit API-key login, so standalone runs use
+    /// x-api-key instead of falling back to OAuth. `None` clears the pin.
+    pub fn set_runtime_provider_pin(runtime_provider: Option<&str>) -> anyhow::Result<()> {
+        let mut cfg = Self::load();
+        cfg.provider.runtime_provider_pin = runtime_provider.map(|s| s.to_string());
+        cfg.save()?;
+        crate::logging::info(&format!(
+            "Saved runtime provider pin: {}",
+            runtime_provider.unwrap_or("(none)")
+        ));
+        Ok(())
+    }
+
     /// Update just the default model in the config file.
     pub fn set_default_model_only(model: Option<&str>) -> anyhow::Result<()> {
         let cfg = Self::load();
