@@ -1,5 +1,5 @@
-use crate::env::{product_env};
 use super::*;
+use crate::env::product_env;
 use crate::tui::TuiState as _;
 use std::cell::RefCell;
 use std::sync::Mutex;
@@ -1555,7 +1555,8 @@ impl crate::tui::TuiState for App {
             }
         });
 
-        let memory_info = gather_memory_info(self.memory_enabled, self.session.working_dir.as_deref());
+        let memory_info =
+            gather_memory_info(self.memory_enabled, self.session.working_dir.as_deref());
 
         // Gather swarm info
         let swarm_info = if self.swarm_enabled {
@@ -2138,6 +2139,10 @@ impl crate::tui::TuiState for App {
         self.pending_permission_input.as_ref()
     }
 
+    fn pending_permission_finding(&self) -> Option<&next_code_command_risk::RiskFinding> {
+        self.pending_permission_finding.as_ref()
+    }
+
     fn viewing_teammate_session_id(&self) -> Option<&str> {
         self.viewing_teammate_session_id.as_deref()
     }
@@ -2483,8 +2488,11 @@ impl App {
 
         let exe = std::env::current_exe().unwrap_or_else(|_| std::path::PathBuf::from("next-code"));
         let cwd = std::env::current_dir().unwrap_or_else(|_| std::path::PathBuf::from("."));
-        match next_code_app_core::session_launch::spawn_resume_in_new_terminal(&exe, &session_id, &cwd)
-        {
+        match next_code_app_core::session_launch::spawn_resume_in_new_terminal(
+            &exe,
+            &session_id,
+            &cwd,
+        ) {
             Ok(true) => self.set_status_notice(format!("Opened {label} in a new window")),
             Ok(false) => self.set_status_notice(format!(
                 "Could not open a terminal for {label} (no emulator found)"

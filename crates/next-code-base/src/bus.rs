@@ -483,6 +483,9 @@ pub struct PermissionRequested {
     pub allow_once_code: String,
     pub alternatives: Vec<String>,
     pub tool_input: Option<serde_json::Value>,
+    /// Command-risk justification for the decision (NX-PERM-002), if any.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub finding: Option<next_code_command_risk::RiskFinding>,
 }
 
 pub struct Bus {

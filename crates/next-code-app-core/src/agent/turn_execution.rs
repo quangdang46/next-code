@@ -997,6 +997,7 @@ impl Agent {
                     reason,
                     allow_once_code,
                     alternatives,
+                    finding,
                 } => {
                     // Publish bus event so TUI can show a permission dialog
                     let tool_input =
@@ -1009,6 +1010,7 @@ impl Agent {
                             allow_once_code: allow_once_code.clone(),
                             alternatives: alternatives.clone(),
                             tool_input,
+                            finding: finding.clone(),
                         },
                     ));
 
