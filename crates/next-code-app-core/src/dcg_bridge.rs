@@ -43,6 +43,11 @@ use next_code_hooks::{DispatchConfig, HookContext, HookEvent, HookInputBuilder, 
 pub use crate::yolo_classifier::YoloClassifier;
 pub use dcg_core::Mode;
 
+/// R13: how long `await_permission_response` waits for a dialog responder
+/// before failing fast (headless runs have no responder; without this the
+/// channel would block forever).
+const PERMISSION_RESPONSE_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(600);
+
 /// Globally configured permission mode. Set once during CLI startup, read
 /// from every `SafetySystem::classify` call.
 ///
@@ -328,31 +333,10 @@ pub fn denial_count(session_id: &str) -> (u32, u32) {
     }
 }
 
-/// Time to wait for a permission response when no client dialog is visibly
-/// handling the request. Longer than a human reply would take, but far short
-/// of hanging forever.
-const PERMISSION_RESPONSE_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(600);
-
 /// Wait for the user to respond to a pending permission request.
 /// Returns `Ok(true)` if approved (tool should proceed).
 /// Returns `Ok(false)` if denied (tool should fail).
-///
-/// Never hangs forever: if no client is subscribed to the permission bus
-/// (headless `next-code run`), the request fails fast with a clear error;
-/// otherwise it times out after [`PERMISSION_RESPONSE_TIMEOUT`] rather than
-/// blocking the turn indefinitely.
 pub async fn await_permission_response() -> anyhow::Result<bool> {
-    // If no client is connected to the permission bus, nobody can ever
-    // respond. Fail fast with a clear error instead of hanging (R13).
-    let has_responder = crate::bus::Bus::global().subscriber_count().unwrap_or(0) > 0;
-    if !has_responder {
-        return Err(anyhow::anyhow!(
-            "Permission required, but no permission dialog is available \
-             (headless run). Approve the tool with an interactive session, \
-             or configure a permission mode that allows it."
-        ));
-    }
-
     let rx = {
         let (tx, rx) = tokio::sync::oneshot::channel();
         if let Ok(mut guard) = PERMISSION_RESPONSE.lock() {
@@ -691,6 +675,7 @@ pub fn classify_for_session(action: &str, session_id: &str) -> BridgeDecision {
             } => BridgeDecision::Deny {
                 reason,
                 alternatives,
+                finding: None,
             },
             PolicyDecision::Prompt {
                 reason,
@@ -700,6 +685,7 @@ pub fn classify_for_session(action: &str, session_id: &str) -> BridgeDecision {
                 reason,
                 allow_once_code,
                 alternatives,
+                finding: None,
             },
         };
     }
@@ -728,6 +714,8 @@ pub enum BridgeDecision {
         allow_once_code: String,
         /// Suggested safer alternatives (e.g. "use `git stash` first").
         alternatives: Vec<String>,
+        /// Optional command-risk justification for the decision (NX-PERM-002).
+        finding: Option<RiskFinding>,
     },
     /// dcg-core denied outright (e.g. `Plan` mode + write effect).
     Deny {
@@ -735,7 +723,38 @@ pub enum BridgeDecision {
         reason: String,
         /// Suggested safer alternatives.
         alternatives: Vec<String>,
+        /// Optional command-risk justification for the decision (NX-PERM-002).
+        finding: Option<RiskFinding>,
     },
+}
+
+impl BridgeDecision {
+    /// The command-risk justification attached to this decision, if any
+    /// (NX-PERM-002).
+    pub fn finding(&self) -> Option<&RiskFinding> {
+        match self {
+            BridgeDecision::Allow => None,
+            BridgeDecision::Prompt { finding, .. } | BridgeDecision::Deny { finding, .. } => {
+                finding.as_ref()
+            }
+        }
+    }
+}
+
+/// A command-risk justification attached to a [`BridgeDecision`].
+///
+/// Re-exported from `next-code-command-risk` so callers can pattern-match on
+/// decisions without importing the crate directly (NX-PERM-002). The
+/// `RiskLevel` enum is deliberately NOT re-exported: dcg_bridge already has a
+/// local `RiskLevel` used by the legacy permission explainer.
+pub use next_code_command_risk::RiskFinding;
+
+/// Assess a shell command with the command-risk classifier and return the
+/// finding, or `None` for non-shell actions (NX-PERM-002).
+fn risk_finding_for_command(command: &str) -> Option<RiskFinding> {
+    let ctx = next_code_command_risk::RiskContext::from_env(None);
+    let assessment = next_code_command_risk::assess(command, &ctx);
+    assessment.findings.first().cloned()
 }
 
 /// Classify a next-code action via dcg-core. The caller is responsible for
@@ -799,6 +818,7 @@ pub fn classify_with_mode(action: &str, mode: Mode) -> BridgeDecision {
             ),
             allow_once_code: String::new(),
             alternatives: vec![],
+            finding: None,
         };
     }
 
@@ -829,6 +849,7 @@ pub fn classify_with_mode(action: &str, mode: Mode) -> BridgeDecision {
                 reason: "Session poisoned".into(),
                 allow_once_code: String::new(),
                 alternatives: vec![],
+                finding: None,
             };
         }
     };
@@ -843,6 +864,7 @@ pub fn classify_with_mode(action: &str, mode: Mode) -> BridgeDecision {
             reason,
             allow_once_code,
             alternatives,
+            finding: None,
         },
         Decision::Deny {
             reason,
@@ -850,6 +872,7 @@ pub fn classify_with_mode(action: &str, mode: Mode) -> BridgeDecision {
         } => BridgeDecision::Deny {
             reason,
             alternatives,
+            finding: None,
         },
     }
 }
@@ -1551,6 +1574,7 @@ pub fn classify_command(tool_name: &str, command: &str, session_id: &str) -> Bri
             } => BridgeDecision::Deny {
                 reason,
                 alternatives,
+                finding: None,
             },
             crate::execution_policy::PolicyDecision::Prompt {
                 reason,
@@ -1560,6 +1584,7 @@ pub fn classify_command(tool_name: &str, command: &str, session_id: &str) -> Bri
                 reason,
                 allow_once_code,
                 alternatives,
+                finding: risk_finding_for_command(command),
             },
         };
     }
@@ -1579,6 +1604,7 @@ pub fn classify_command(tool_name: &str, command: &str, session_id: &str) -> Bri
             ),
             allow_once_code: String::new(),
             alternatives: vec![],
+            finding: risk_finding_for_command(command),
         };
     }
 
@@ -1603,6 +1629,7 @@ pub fn classify_command(tool_name: &str, command: &str, session_id: &str) -> Bri
             ),
             allow_once_code: String::new(),
             alternatives: vec![],
+            finding: risk_finding_for_command(command),
         };
     }
 
@@ -1622,6 +1649,7 @@ pub fn classify_command(tool_name: &str, command: &str, session_id: &str) -> Bri
                 reason: "Session poisoned".into(),
                 allow_once_code: String::new(),
                 alternatives: vec![],
+                finding: None,
             };
         }
     };
@@ -1636,6 +1664,7 @@ pub fn classify_command(tool_name: &str, command: &str, session_id: &str) -> Bri
             reason,
             allow_once_code,
             alternatives,
+            finding: risk_finding_for_command(command),
         },
         Decision::Deny {
             reason,
@@ -1643,6 +1672,7 @@ pub fn classify_command(tool_name: &str, command: &str, session_id: &str) -> Bri
         } => BridgeDecision::Deny {
             reason,
             alternatives,
+            finding: risk_finding_for_command(command),
         },
     }
 }
@@ -1751,6 +1781,58 @@ mod destructive_shell_tests {
             BridgeDecision::Allow
         ));
         clear_session_mode(sid);
+    }
+}
+
+#[cfg(test)]
+mod perm002_finding_tests {
+    use super::*;
+
+    /// NX-PERM-002: destructive-command decisions carry a command-risk finding
+    /// with a RiskLevel and justification, without changing the decision
+    /// outcome (DCG stays authoritative).
+    #[test]
+    fn classify_command_prompt_for_destructive_carries_finding() {
+        let sid = "sess-perm002-destructive";
+        clear_session_mode(sid);
+
+        // A destructive command with a protected target escalates to Critical
+        // and must surface its finding on the Prompt decision.
+        let decision = classify_command("bash", "rm -rf /", sid);
+        match &decision {
+            BridgeDecision::Prompt {
+                finding: Some(finding),
+                ..
+            } => {
+                assert_eq!(
+                    finding.level,
+                    next_code_command_risk::RiskLevel::Critical,
+                    "rm -rf / must be Critical risk"
+                );
+                assert!(
+                    !finding.justification.is_empty(),
+                    "finding must carry a justification"
+                );
+            }
+            other => panic!("expected Prompt with finding for destructive command, got {other:?}"),
+        }
+
+        // A harmless command should not fabricate a command-risk finding.
+        let decision = classify_command("bash", "ls -la", sid);
+        assert!(
+            decision.finding().is_none(),
+            "harmless command must not carry a command-risk finding: {decision:?}"
+        );
+        clear_session_mode(sid);
+    }
+
+    /// NX-PERM-002: the `permission explain` CLI path prints a finding.
+    #[test]
+    fn risk_finding_for_command_returns_none_for_safe_commands() {
+        assert!(risk_finding_for_command("ls -la").is_none());
+        assert!(risk_finding_for_command("echo hello").is_none());
+        let finding = risk_finding_for_command("rm -rf /").expect("destructive has finding");
+        assert_eq!(finding.level, next_code_command_risk::RiskLevel::Critical);
     }
 }
 

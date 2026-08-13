@@ -898,13 +898,33 @@ pub(super) fn draw_permission_dialog_overlay(
         ),
     };
 
-    // Render risk badge in dialog
-    let risk_text = if risk != crate::dcg_bridge::RiskLevel::Low {
+    // Render risk badge in dialog. When a command-risk finding (NX-PERM-002)
+    // is attached to the decision, prefer its level + justification over the
+    // legacy tool-call explainer so the user sees the actual reason.
+    let (risk_str, risk_color, finding_text) =
+        if let Some(finding) = app.pending_permission_finding() {
+            use next_code_command_risk::RiskLevel as CmdRisk;
+            let color = match finding.level {
+                CmdRisk::Safe | CmdRisk::Low => rgb(100, 180, 100),
+                CmdRisk::Medium => rgb(235, 190, 105),
+                CmdRisk::High => rgb(235, 160, 80),
+                CmdRisk::Critical => rgb(255, 100, 100),
+            };
+            (
+                format!("{:?}", finding.level),
+                color,
+                Some(finding.description()),
+            )
+        } else {
+            let risk_str = format!("{}", risk);
+            (risk_str, risk_color, None)
+        };
+    let risk_text = if finding_text.is_some() || risk != crate::dcg_bridge::RiskLevel::Low {
         format!(" Risk: {} ", risk_str)
     } else {
         String::new()
     };
-    if !risk_text.is_empty() {
+    if !risk_text.is_empty() || finding_text.is_some() {
         let risk_badge = Line::from(Span::styled(
             risk_text,
             Style::default().fg(risk_color).add_modifier(Modifier::BOLD),
@@ -914,6 +934,16 @@ pub(super) fn draw_permission_dialog_overlay(
         // Let's just append a risk line before the last 2 lines (option + hint)
         if lines.len() >= 2 {
             lines.insert(lines.len() - 2, risk_badge);
+        }
+        // Command-risk justification line (NX-PERM-002).
+        if let Some(text) = finding_text {
+            let just_line = Line::from(Span::styled(
+                format!(" ⚠ {text}"),
+                Style::default().fg(risk_color),
+            ));
+            if lines.len() >= 2 {
+                lines.insert(lines.len() - 2, just_line);
+            }
         }
     }
 

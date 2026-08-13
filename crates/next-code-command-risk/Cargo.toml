@@ -1,0 +1,11 @@
+[package]
+name = "next-code-command-risk"
+version = "0.1.0"
+edition = "2024"
+description = "Deterministic risk classification for shell commands (RiskLevel + justification per command)"
+
+[dependencies]
+serde = { version = "1", features = ["derive"] }
+
+[dev-dependencies]
+tempfile = "3"
