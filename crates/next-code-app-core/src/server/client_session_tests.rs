@@ -248,3 +248,51 @@ mod clear_tests;
 mod reload_tests;
 #[path = "client_session_tests/resume.rs"]
 mod resume_tests;
+
+/// R8: a session created via the agent-creation path is persisted before the
+/// first turn, so a kill -9 while idle leaves a restorable session.
+#[tokio::test]
+async fn session_creation_persists_before_first_turn() {
+    let _guard = crate::storage::lock_test_env();
+    let provider: Arc<dyn Provider> = Arc::new(MockProvider);
+    let registry = Registry::new(provider.clone()).await;
+    let agent = crate::agent::Agent::new_with_initial_working_dir(
+        provider,
+        registry,
+        Some(std::env::temp_dir().to_str().unwrap()),
+    );
+    let sid = agent.session_id().to_string();
+    // The session must already be loadable from disk (journal/snapshot) — no
+    // turn ran yet.
+    assert!(
+        crate::session::Session::load(&sid).is_ok(),
+        "session {} must be persisted at creation (R8)",
+        sid
+    );
+}
+
+/// R7: marking a session Closed/Crashed and saving persists the state so a
+/// restart shows the session as closed, not Active.
+#[tokio::test]
+async fn disconnect_mark_closed_persists_status() {
+    let _guard = crate::storage::lock_test_env();
+    let provider: Arc<dyn Provider> = Arc::new(MockProvider);
+    let registry = Registry::new(provider.clone()).await;
+    let mut agent = crate::agent::Agent::new_with_initial_working_dir(
+        provider,
+        registry,
+        Some(std::env::temp_dir().to_str().unwrap()),
+    );
+    let sid = agent.session_id().to_string();
+
+    agent.mark_closed();
+    agent.persist_session_best_effort("test close");
+
+    // Reload from disk: status must be Closed, not Active.
+    let reloaded = crate::session::Session::load(&sid).expect("reload session");
+    assert!(
+        matches!(reloaded.status, crate::session::SessionStatus::Closed),
+        "persisted session must be Closed after disconnect cleanup (R7), got {:?}",
+        reloaded.status
+    );
+}

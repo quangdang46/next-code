@@ -1,6 +1,6 @@
 #![cfg_attr(test, allow(clippy::await_holding_lock))]
 
-use crate::env::{product_env};
+use crate::env::product_env;
 pub mod best_of_n_orchestrator;
 mod compaction;
 mod environment;
@@ -63,16 +63,17 @@ pub use next_code_agent_runtime::{
 const NEXT_CODE_NATIVE_TOOLS: &[&str] = &["selfdev", "communicate"];
 static RECOVERED_TEXT_WRAPPED_TOOL_CALLS: std::sync::atomic::AtomicU64 =
     std::sync::atomic::AtomicU64::new(0);
-static NEXT_CODE_REPO_SOURCE_STATE: LazyLock<(Option<String>, Option<bool>)> = LazyLock::new(|| {
-    crate::build::get_repo_dir()
-        .map(|repo_dir| {
-            (
-                build::current_git_hash(&repo_dir).ok(),
-                build::is_working_tree_dirty(&repo_dir).ok(),
-            )
-        })
-        .unwrap_or((None, None))
-});
+static NEXT_CODE_REPO_SOURCE_STATE: LazyLock<(Option<String>, Option<bool>)> =
+    LazyLock::new(|| {
+        crate::build::get_repo_dir()
+            .map(|repo_dir| {
+                (
+                    build::current_git_hash(&repo_dir).ok(),
+                    build::is_working_tree_dirty(&repo_dir).ok(),
+                )
+            })
+            .unwrap_or((None, None))
+    });
 static WORKING_GIT_STATE_CACHE: LazyLock<StdMutex<HashMap<PathBuf, Option<GitState>>>> =
     LazyLock::new(|| StdMutex::new(HashMap::new()));
 #[cfg(feature = "dcp")]
@@ -474,6 +475,9 @@ impl Agent {
         agent.session.provider_key =
             crate::session::derive_session_provider_key(agent.provider.name());
         agent.session.ensure_initial_session_context_message();
+        // Persist the freshly-created session before the first turn (R8): a
+        // kill -9 while idle must leave a restorable session, not a phantom.
+        agent.persist_session_best_effort("session creation");
 
         // Pre-approve tools from the always-allow config list.
         crate::dcg_bridge::init_session_allow_list(&agent.session.id);
@@ -761,9 +765,8 @@ impl Agent {
         memory: &crate::memory::PendingMemory,
     ) -> (Message, bool) {
         let message = Self::memory_injection_message(memory);
-        let persist = crate::config::config().experiment_enabled(
-            next_code_experiment_flags::ExperimentFlag::PersistMemoryInjection,
-        );
+        let persist = crate::config::config()
+            .experiment_enabled(next_code_experiment_flags::ExperimentFlag::PersistMemoryInjection);
         if persist {
             self.add_message_with_display_role(
                 Role::User,
@@ -775,7 +778,7 @@ impl Agent {
         (message, persist)
     }
 
-    fn persist_session_best_effort(&mut self, context: &str) {
+    pub(crate) fn persist_session_best_effort(&mut self, context: &str) {
         if let Err(err) = self.session.save() {
             logging::warn(&format!(
                 "Failed to persist {} for session {}: {}",
